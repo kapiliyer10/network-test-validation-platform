@@ -2,71 +2,106 @@
 
 ## 1. Project Overview
 
-The Network Test & Validation Platform is a Python-based framework for validating network behavior in a controlled lab.
+The Network Test & Validation Platform is a Python-based framework for
+testing and validating network behavior in a controlled lab.
 
-It is a separate project from the Network Automation & Programmability Platform (Project 1).
+It is separate from Project 1, the Network Automation & Programmability
+Platform.
 
-- **Project 1** configures network devices, discovers state, detects configuration drift, and applies configuration.
-- **Project 2** tests network behavior, validates connectivity and routing, and reports test results.
+- **Project 1** configures network devices, discovers device state,
+  detects configuration drift, and applies configuration.
+- **Project 2** validates connectivity, network behavior, protocol state,
+  failure recovery, and traffic performance, and collects test evidence.
 
-Project 2 reuses Project 1's existing Containerlab testbed. It does not maintain a duplicate topology or configuration system.
+Project 2 reuses the existing Project 1 Containerlab environment. It does
+not duplicate Project 1's configuration management or network-state
+management systems.
 
-## 2. Current Scope
+## 2. Architecture
 
-The initial implementation establishes the test environment and verifies that Project 2 can discover the running Project 1 router containers.
+The current test execution flow is:
 
-Planned capabilities include:
+    Test definitions in configs/lab.yaml
+                    |
+                    v
+             src/testbed.py
+                    |
+                    v
+             RouterDevice
+                    |
+                    v
+            src/cli_runner.py
+                    |
+                    v
+        Docker exec -> SR Linux CLI
+                    |
+                    v
+           Output validation
+                    |
+                    v
+              Test result
 
-- Connectivity validation
-- Routing and OSPF validation
-- Failure and recovery testing
-- Traffic performance testing
-- Packet capture and analysis
-- Automated test reporting
-- CI/CD integration
+The `Testbed` abstraction resolves logical router names to the existing
+Docker containers. `RouterDevice` provides a common command-execution
+interface, and the existing CLI runner performs the actual interaction.
 
-These are planned capabilities, not all completed features.
+The implementation intentionally remains small. It does not recreate
+Project 1's inventory, discovery, configuration, or drift-detection
+architecture.
 
 ## 3. Technology Stack
 
+Core:
 - Python 3.12
-- Docker SDK for Python
-- Docker Engine
-- pytest
+- Linux
+- Git
+- Docker Engine and Docker SDK for Python
 - Containerlab
-- Nokia SR Linux
+- pytest
+- pyATS AEtest
+- PyYAML
+
+Network testing and troubleshooting:
+- ICMP connectivity tests
+- TCP-probe diagnostics
+- Planned routing, protocol, and interface validation
+- Planned iPerf3 traffic testing
+- Planned tcpdump and Wireshark analysis
+
+Genie parsing and native pyATS/Unicon integration for Nokia SR Linux have
+not been established. The current AEtest implementation reuses the
+existing Docker-based CLI runner.
 
 ## 4. Relationship with Project 1
 
 Project 2 uses the existing three-router Project 1 lab:
 
-```text
         R1
        /  \
       /    \
      R2----R3
-```
 
-The logical router names are R1, R2, and R3. Their containers are named:
+The Docker containers are:
 
-```text
-clab-srl-lab-R1
-clab-srl-lab-R2
-clab-srl-lab-R3
-```
+    clab-srl-lab-R1
+    clab-srl-lab-R2
+    clab-srl-lab-R3
 
-Project 1 remains responsible for creating, configuring, and managing this lab. Project 2 checks whether the environment is ready for testing.
+Project 1 remains responsible for creating, configuring, and managing the
+network. Project 2 verifies behavior through tests.
 
-Repository separation is intentional: the projects have independent Python environments, dependencies, source code, and responsibilities.
+The repositories and Python environments are separate. The projects
+share the existing lab but maintain separate responsibilities,
+dependencies, source code, and test workflows.
 
 ## 5. Prerequisites
 
-Before running Project 2, ensure that you have:
+Before running Project 2, ensure that:
 
-- Python 3.12
-- Docker Engine running and accessible to your user
-- The Project 1 repository and its Containerlab prerequisites
-- The Project 1 lab running in the same Docker environment that Project 2 can access
+- Python 3.12 is available.
+- Docker Engine is running and accessible to your user.
+- The Project 1 repository and its Containerlab prerequisites are installed.
+- The Project 1 lab is running and accessible from Project 2.
 
 The Docker Python package does not install or start Docker Engine.
 
@@ -74,88 +109,169 @@ The Docker Python package does not install or start Docker Engine.
 
 From the Project 1 repository:
 
-```bash
-cd ~/network-automation-platform
-./scripts/lab_up.sh
-```
+    cd ~/network-automation-platform
+    ./scripts/lab_up.sh
 
-Wait for the lab to start before running Project 2 checks.
+Wait for the lab to start before running Project 2 integration tests.
 
-Project 1's topology references configuration files beneath `~/network-automation-platform`. Keep that expected location unless the topology paths have been deliberately adapted.
+The existing Project 1 topology expects its configuration files beneath
+`~/network-automation-platform`. Keep that location unless the topology
+paths have been deliberately adapted.
 
 ## 7. Set Up Project 2
 
-From the Project 2 repository:
+Create and activate the Project 2 virtual environment:
 
-```bash
-cd ~/network-test-validation-platform
+    cd ~/network-test-validation-platform
 
-python3.12 -m venv .venv
-source .venv/bin/activate
+    python3.12 -m venv .venv
+    source .venv/bin/activate
 
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
+Install the pinned dependencies:
 
-The `requirements.txt` file pins the Python package versions used by the current environment.
+    python -m pip install --upgrade pip
+    python -m pip install -r requirements.txt
 
-Check for dependency conflicts:
+The requirements file includes the verified pyATS 26.9 dependency set
+alongside the project's existing Python dependencies. Genie is not
+currently included.
 
-```bash
-python -m pip check
-```
+Check dependency health:
+
+    python -m pip check
 
 Expected output:
 
-```text
-No broken requirements found.
-```
+    No broken requirements found.
 
 ## 8. Check Lab Readiness
 
-With the Project 2 virtual environment activated, run:
+With the Project 2 environment activated:
 
-```bash
-python -m scripts.check_lab_readiness
-```
+    python -m scripts.check_lab_readiness
 
-When all required router containers exist and are running, the output is:
+The check verifies that Docker is accessible and the required router
+containers are present and running.
 
-```text
-Project 1 lab is READY.
-Running routers: R1, R2, R3
-```
+Expected output when the lab is ready:
 
-The check reports an error when Docker cannot be accessed, a required router is missing, or a router is not running.
+    Project 1 lab is READY.
+    Running routers: R1, R2, R3
 
-This is an environment-readiness check; it does not by itself prove that routing or end-to-end connectivity works.
+Readiness alone does not prove that routing or connectivity works.
 
-## 9. Run the Integration Test
+## 9. Run pytest
 
-Run the router-discovery integration test:
+Run the complete pytest suite:
 
-```bash
-pytest -v tests/integration/test_lab_discovery.py
-```
+    pytest -q
 
-This test uses the real Docker environment to verify that R1, R2, and R3 are discoverable and running.
+Run unit tests independently:
 
-The test requires the Project 1 lab to be running.
+    pytest -q -m unit
 
-## 10. Current Status
+Run integration tests independently:
 
-**Milestone 1 — Test Environment Foundation:** In progress.
+    pytest -q -m integration
 
-Completed:
-- Separate Project 2 repository and virtual environment
-- Pinned Python dependencies
-- Real Docker-based router discovery
-- Router-discovery integration test
-- Lab-readiness command
-- Manual connectivity checks for the three directly connected router pairs
+Current verified results:
 
-Remaining:
-- Complete and verify the environment setup documentation
-- Confirm the environment can be prepared reliably by following the documented procedure
+- Full pytest suite: 10 passed
+- Unit tests: 6 passed
+- Integration tests: 4 passed
 
-Connectivity automation and the later validation capabilities remain subsequent milestones.
+The unit tests cover the Docker client and testbed configuration
+resolution. Integration tests include real Docker-based router discovery
+and TCP-probe diagnostics.
+
+The TCP-probe tests do not establish successful application-level TCP
+connections. Their results are diagnostic evidence about TCP probe
+responses.
+
+## 10. Run pyATS AEtest Connectivity Tests
+
+The AEtest suite uses the connectivity targets defined in
+`configs/lab.yaml`:
+
+    python tests/aetest/connectivity.py
+
+The current test cases are:
+
+- R1 to R2: 10.0.12.2
+- R1 to R3: 10.0.31.2
+- R2 to R3: 10.0.23.2
+
+Each test executes a ping through the existing SR Linux CLI runner and
+validates three received replies with 0% packet loss.
+
+All three cases have passed against the running lab.
+
+These tests demonstrate pyATS AEtest orchestration using the existing
+adapter. They do not demonstrate native SR Linux connection-plugin
+support or built-in Genie parsing for SR Linux.
+
+## 11. Current Implementation Status
+
+### Milestone 1 — Test Environment and Project 1 Integration
+
+Status: Complete.
+
+- Separate repository and virtual environment
+- Pinned dependencies
+- Docker-based router discovery
+- Lab-readiness check
+- Setup documentation
+
+### Milestone 2 — pytest Framework and Testbed Foundation
+
+Status: Foundation established.
+
+- Unit and integration test categories
+- pytest markers
+- YAML-based lab and connectivity definitions
+- Reusable testbed abstraction
+- Unit tests for testbed resolution and validation
+
+### Milestone 3 — Connectivity and Transport Validation
+
+Status: In progress.
+
+- Three ICMP connectivity cases verified with pytest and AEtest
+- TCP traceroute probes available as diagnostics
+- Application-level TCP connectivity not yet verified
+- Dedicated TCP/UDP traffic endpoints not yet implemented
+
+### Milestone 4 — Testbed and pyATS Integration
+
+Status: Initial integration verified.
+
+- pyATS AEtest runs the YAML-driven connectivity scenarios
+- Existing Docker-based CLI execution is reused
+- Native SR Linux Unicon support and Genie parsing remain unverified
+
+### Remaining milestones
+
+5. Interfaces, routing, protocols, and management validation
+6. Negative testing, failure recovery, and regression
+7. Traffic and performance testing
+8. Packet capture and troubleshooting
+9. Test reporting and quality metrics
+10. CI/CD and end-to-end validation
+
+These milestones remain planned and should only be marked complete after
+their functionality has been implemented and verified.
+
+## 12. Development Principles
+
+- Keep Project 1 and Project 2 separate.
+- Reuse the existing network instead of rebuilding its configuration
+  management in Project 2.
+- Write tests that validate observable behavior and meaningful
+  requirements.
+- Distinguish diagnostic responses from successful application-level
+  communication.
+- Prefer real-lab integration tests where appropriate and unit tests for
+  isolated logic.
+- Introduce additional frameworks and abstractions only when they add
+  demonstrated value.
+- Collect evidence and report failures clearly.
