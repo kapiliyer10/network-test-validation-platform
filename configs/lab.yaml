@@ -1,0 +1,22 @@
+lab:
+  name: project1-srl-lab
+  container_prefix: clab-srl-lab-
+  network_instance: default
+
+  routers:
+    - R1
+    - R2
+    - R3
+
+connectivity_tests:
+  - name: R1_to_R2
+    source: R1
+    destination: 10.0.12.2
+
+  - name: R1_to_R3
+    source: R1
+    destination: 10.0.31.2
+
+  - name: R2_to_R3
+    source: R2
+    destination: 10.0.23.2
