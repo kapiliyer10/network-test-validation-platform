@@ -188,27 +188,43 @@ The TCP-probe tests do not establish successful application-level TCP
 connections. Their results are diagnostic evidence about TCP probe
 responses.
 
-## 10. Run pyATS AEtest Connectivity Tests
+## 10. Run pyATS AEtest Suites
 
-The AEtest suite uses the connectivity targets defined in
-`configs/lab.yaml`:
+Activate the Project 2 virtual environment before running these commands.
+
+Run the connectivity tests:
 
     python tests/aetest/connectivity.py
 
-The current test cases are:
+Run interface validation:
 
-- R1 to R2: 10.0.12.2
-- R1 to R3: 10.0.31.2
-- R2 to R3: 10.0.23.2
+    python tests/aetest/interfaces.py
 
-Each test executes a ping through the existing SR Linux CLI runner and
-validates three received replies with 0% packet loss.
+Run OSPF neighbor validation:
 
-All three cases have passed against the running lab.
+    python tests/aetest/ospf.py
 
-These tests demonstrate pyATS AEtest orchestration using the existing
-adapter. They do not demonstrate native SR Linux connection-plugin
-support or built-in Genie parsing for SR Linux.
+Run route validation:
+
+    python tests/aetest/routes.py
+
+The current AEtest suites cover 21 configured validation cases:
+
+- 3 ICMP connectivity checks across the configured router pairs
+- 6 Ethernet interface operational-state checks
+- 6 OSPF neighbor checks covering expected router IDs and FULL adjacency
+  state
+- 6 OSPF-learned remote loopback route checks, including prefix, route
+  type, next hop, outgoing interface, and best-route status
+
+The tests execute commands through the existing Project 2 testbed and CLI
+runner. The runner uses Docker to invoke the SR Linux CLI within each
+router container.
+
+These tests validate actual operational output from the running lab.
+They do not establish native Unicon connection-plugin support or built-in
+Genie parsing for Nokia SR Linux. The route and interface validation
+currently uses parsing tailored to the observed SR Linux CLI output.
 
 ## 11. Current Implementation Status
 
@@ -228,16 +244,16 @@ Status: Foundation established.
 
 - Unit and integration test categories
 - pytest markers
-- YAML-based lab and connectivity definitions
-- Reusable testbed abstraction
+- YAML-based lab and test definitions
+- Reusable Testbed and RouterDevice abstractions
 - Unit tests for testbed resolution and validation
 
 ### Milestone 3 — Connectivity and Transport Validation
 
 Status: In progress.
 
-- Three ICMP connectivity cases verified with pytest and AEtest
-- TCP traceroute probes available as diagnostics
+- Three ICMP connectivity cases verified through AEtest
+- TCP traceroute probes retained as diagnostics
 - Application-level TCP connectivity not yet verified
 - Dedicated TCP/UDP traffic endpoints not yet implemented
 
@@ -245,21 +261,32 @@ Status: In progress.
 
 Status: Initial integration verified.
 
-- pyATS AEtest runs the YAML-driven connectivity scenarios
+- pyATS AEtest runs YAML-driven network validation scenarios
+- pyATS 26.9 dependencies are pinned
 - Existing Docker-based CLI execution is reused
-- Native SR Linux Unicon support and Genie parsing remain unverified
+- Native SR Linux Unicon support and built-in Genie parsing remain
+  unverified
+
+### Milestone 5 — Interfaces, Routing, Protocols, and Management
+
+Status: In progress.
+
+- Six Ethernet interface operational-state checks verified
+- Six expected OSPF neighbor adjacencies verified as FULL
+- Six OSPF-learned remote loopback routes validated
+- Additional protocol, management-interface, and VLAN validation
+  remains planned
 
 ### Remaining milestones
 
-5. Interfaces, routing, protocols, and management validation
 6. Negative testing, failure recovery, and regression
 7. Traffic and performance testing
 8. Packet capture and troubleshooting
 9. Test reporting and quality metrics
 10. CI/CD and end-to-end validation
 
-These milestones remain planned and should only be marked complete after
-their functionality has been implemented and verified.
+These milestones remain planned until their functionality has been
+implemented and verified.
 
 ## 12. Development Principles
 

@@ -52,6 +52,21 @@ class Testbed:
         self.name = lab["name"]
         self.container_prefix = lab["container_prefix"]
         self.network_instance = lab["network_instance"]
+        self.connectivity_tests = configuration.get(
+        "connectivity_tests", []
+        )
+
+        self.interface_tests = configuration.get(
+            "interface_tests", []
+        )
+
+        self.ospf_neighbor_tests = configuration.get(
+            "ospf_neighbor_tests", []
+        )
+
+        self.route_tests = configuration.get(
+            "route_tests", []
+        )
 
         router_names = lab.get("routers", [])
 

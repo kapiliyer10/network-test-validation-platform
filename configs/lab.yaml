@@ -20,3 +20,120 @@ connectivity_tests:
   - name: R2_to_R3
     source: R2
     destination: 10.0.23.2
+
+interface_tests:
+  - name: R1_ethernet_1_1_up
+    router: R1
+    interface: ethernet-1/1
+    expected_state: up
+
+  - name: R1_ethernet_1_2_up
+    router: R1
+    interface: ethernet-1/2
+    expected_state: up
+
+  - name: R2_ethernet_1_1_up
+    router: R2
+    interface: ethernet-1/1
+    expected_state: up
+
+  - name: R2_ethernet_1_2_up
+    router: R2
+    interface: ethernet-1/2
+    expected_state: up
+
+  - name: R3_ethernet_1_1_up
+    router: R3
+    interface: ethernet-1/1
+    expected_state: up
+
+  - name: R3_ethernet_1_2_up
+    router: R3
+    interface: ethernet-1/2
+    expected_state: up
+
+ospf_neighbor_tests:
+  - name: R1_to_R2_OSPF_FULL
+    router: R1
+    interface: ethernet-1/1.0
+    neighbor_router_id: "2.2.2.2"
+    expected_state: full
+
+  - name: R1_to_R3_OSPF_FULL
+    router: R1
+    interface: ethernet-1/2.0
+    neighbor_router_id: "3.3.3.3"
+    expected_state: full
+
+  - name: R2_to_R1_OSPF_FULL
+    router: R2
+    interface: ethernet-1/1.0
+    neighbor_router_id: "1.1.1.1"
+    expected_state: full
+
+  - name: R2_to_R3_OSPF_FULL
+    router: R2
+    interface: ethernet-1/2.0
+    neighbor_router_id: "3.3.3.3"
+    expected_state: full
+
+  - name: R3_to_R2_OSPF_FULL
+    router: R3
+    interface: ethernet-1/1.0
+    neighbor_router_id: "2.2.2.2"
+    expected_state: full
+
+  - name: R3_to_R1_OSPF_FULL
+    router: R3
+    interface: ethernet-1/2.0
+    neighbor_router_id: "1.1.1.1"
+    expected_state: full
+
+route_tests:
+  - name: R1_to_R2_loopback
+    router: R1
+    prefix: 10.255.0.2/32
+    expected_route_type: ospfv2
+    expected_next_hop: 10.0.12.2
+    expected_interface: ethernet-1/1.0
+    expected_best: true
+
+  - name: R1_to_R3_loopback
+    router: R1
+    prefix: 10.255.0.3/32
+    expected_route_type: ospfv2
+    expected_next_hop: 10.0.31.2
+    expected_interface: ethernet-1/2.0
+    expected_best: true
+
+  - name: R2_to_R1_loopback
+    router: R2
+    prefix: 10.255.0.1/32
+    expected_route_type: ospfv2
+    expected_next_hop: 10.0.12.1
+    expected_interface: ethernet-1/1.0
+    expected_best: true
+
+  - name: R2_to_R3_loopback
+    router: R2
+    prefix: 10.255.0.3/32
+    expected_route_type: ospfv2
+    expected_next_hop: 10.0.23.2
+    expected_interface: ethernet-1/2.0
+    expected_best: true
+
+  - name: R3_to_R1_loopback
+    router: R3
+    prefix: 10.255.0.1/32
+    expected_route_type: ospfv2
+    expected_next_hop: 10.0.31.1
+    expected_interface: ethernet-1/2.0
+    expected_best: true
+
+  - name: R3_to_R2_loopback
+    router: R3
+    prefix: 10.255.0.2/32
+    expected_route_type: ospfv2
+    expected_next_hop: 10.0.23.1
+    expected_interface: ethernet-1/1.0
+    expected_best: true
