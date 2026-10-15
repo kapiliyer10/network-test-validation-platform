@@ -240,13 +240,16 @@ Status: Complete.
 
 ### Milestone 2 — pytest Framework and Testbed Foundation
 
-Status: Foundation established.
+Status: Complete.
 
 - Unit and integration test categories
 - pytest markers
 - YAML-based lab and test definitions
 - Reusable Testbed and RouterDevice abstractions
 - Unit tests for testbed resolution and validation
+- 10 pytest tests collected and passing: 6 unit and 4 integration
+- Successful test selection using `pytest -m unit` and `pytest -m integration`
+- Separate pyATS AEtest execution for live network validation
 
 ### Milestone 3 — Connectivity and Transport Validation
 
