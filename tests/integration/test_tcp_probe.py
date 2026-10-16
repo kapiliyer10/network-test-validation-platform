@@ -2,16 +2,20 @@
 
 from pathlib import Path
 import re
-
+import os
 import pytest
 import yaml
 
 from src.cli_runner import run_router_cli_command
 
 
-CONFIG_PATH = (
+DEFAULT_CONFIG_PATH = (
     Path(__file__).resolve().parents[2] / "configs" / "lab.yaml"
 )
+
+CONFIG_PATH = Path(
+    os.environ.get("NETWORK_TESTBED_CONFIG", str(DEFAULT_CONFIG_PATH))
+).expanduser()
 
 with CONFIG_PATH.open(encoding="utf-8") as config_file:
     LAB_CONFIG = yaml.safe_load(config_file)

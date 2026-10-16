@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
+import os
 import yaml
 
 from src.cli_runner import run_router_cli_command
@@ -93,10 +93,20 @@ class Testbed:
     @classmethod
     def from_yaml(
         cls,
-        path: str | Path = DEFAULT_CONFIG_PATH,
+        path: str | Path | None = None,
     ) -> "Testbed":
-        """Load the existing Project 2 lab configuration."""
-        config_path = Path(path)
+        """Load a testbed configuration from an explicit path or environment."""
+
+        if path is not None:
+            config_path = Path(path).expanduser()
+        else:
+            configured_path = os.environ.get("NETWORK_TESTBED_CONFIG")
+
+            config_path = (
+                Path(configured_path).expanduser()
+                if configured_path
+                else DEFAULT_CONFIG_PATH
+            )
 
         with config_path.open(encoding="utf-8") as config_file:
             configuration = yaml.safe_load(config_file)

@@ -1,18 +1,31 @@
+
+"""Discover configured router containers through Docker."""
+
 import docker
 from docker.models.containers import Container
 
-CONTAINER_PREFIX = "clab-srl-lab-"
+from src.testbed import Testbed
 
 
 def discover_lab_routers() -> dict[str, Container]:
-    """Discover Project 1 router containers through Docker."""
+    """Discover configured routers for the selected testbed."""
+    testbed = Testbed.from_yaml()
     client = docker.from_env()
-    containers = client.containers.list(all=True)
 
-    routers = {
-        container.name[len(CONTAINER_PREFIX):]: container
-        for container in containers
-        if container.name.startswith(CONTAINER_PREFIX)
-    }
+    try:
+        containers = client.containers.list(all=True)
 
-    return routers
+        expected_containers = {
+            device.container_name: router_name
+            for router_name, device in testbed.routers.items()
+        }
+
+        routers = {
+            expected_containers[container.name]: container
+            for container in containers
+            if container.name in expected_containers
+        }
+
+        return routers
+    finally:
+        client.close()
