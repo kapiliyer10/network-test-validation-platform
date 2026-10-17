@@ -1,0 +1,33 @@
+testbed:
+  name: srl-lab-pyats-poc
+
+devices:
+  R1:
+    type: router
+    os: srlinux
+    custom:
+      container_name: clab-srl-lab-R1
+    connections:
+      cli:
+        class: src.pyats_docker_connection.DockerSRLConnection
+        protocol: docker
+
+  R2:
+    type: router
+    os: srlinux
+    custom:
+      container_name: clab-srl-lab-R2
+    connections:
+      cli:
+        class: src.pyats_docker_connection.DockerSRLConnection
+        protocol: docker
+
+  R3:
+    type: router
+    os: srlinux
+    custom:
+      container_name: clab-srl-lab-R3
+    connections:
+      cli:
+        class: src.pyats_docker_connection.DockerSRLConnection
+        protocol: docker

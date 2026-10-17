@@ -1,6 +1,5 @@
 """Application-level TCP connectivity tests."""
 
-import os
 from pathlib import Path
 import subprocess
 
@@ -9,14 +8,10 @@ import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "configs" / "lab-expanded.yaml"
 
-CONFIG_PATH = Path(
-    os.environ.get(
-        "NETWORK_TESTBED_CONFIG",
-        str(DEFAULT_CONFIG_PATH),
-    )
-).expanduser()
+CONFIG_PATH = (
+    PROJECT_ROOT / "configs" / "lab-expanded.yaml"
+)
 
 with CONFIG_PATH.open(encoding="utf-8") as config_file:
     LAB_CONFIG = yaml.safe_load(config_file)
@@ -49,7 +44,7 @@ if response != expected:
 print(f"TCP application response verified: {response.decode()}")
 """
 
-
+@pytest.mark.expanded_lab
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "test_case",

@@ -64,13 +64,15 @@ Core:
 Network testing and troubleshooting:
 - ICMP connectivity tests
 - TCP-probe diagnostics
-- Planned routing, protocol, and interface validation
+- Interface operational-state, OSPF neighbor, and route validation
 - Planned iPerf3 traffic testing
 - Planned tcpdump and Wireshark analysis
 
-Genie parsing and native pyATS/Unicon integration for Nokia SR Linux have
-not been established. The current AEtest implementation reuses the
-existing Docker-based CLI runner.
+Native pyATS testbed loading and a custom Docker connection adapter
+have been verified against the baseline SR Linux lab. The adapter reuses
+the existing CLI runner and does not establish a persistent SSH session.
+Genie parsers are not used for SR Linux. Structured interface state is
+validated using native JSON output and Python's json module.
 
 ## 4. Relationship with Project 1
 
@@ -162,31 +164,59 @@ Readiness alone does not prove that routing or connectivity works.
 
 ## 9. Run pytest
 
-Run the complete pytest suite:
+The test suite covers two Containerlab topologies. Until Milestone 10
+automates deployment and cleanup, run the test group that matches the
+topology currently running. Do not run the entire suite with `pytest -q`
+when only one topology is deployed.
 
-    pytest -q
+### Run the baseline suite
+
+The baseline `srl-lab` contains R1, R2, and R3.
+
+    unset NETWORK_TESTBED_CONFIG
+    pytest -q -m "not expanded_lab"
+
+Most recently verified result:
+
+    17 passed, 2 deselected
+
+The two deselected tests are the expanded-lab TCP and UDP application
+tests. The baseline suite includes unit tests and router-only integration
+tests, including TCP-probe diagnostics.
 
 Run unit tests independently:
 
     pytest -q -m unit
 
-Run integration tests independently:
+Run baseline integration tests independently:
 
-    pytest -q -m integration
+    unset NETWORK_TESTBED_CONFIG
+    pytest -q -m "integration and not expanded_lab"
 
-Current verified results:
+### Run the expanded-lab TCP and UDP application tests
 
-- Full pytest suite: 10 passed
-- Unit tests: 6 passed
-- Integration tests: 4 passed
+The application tests use `configs/lab-expanded.yaml` directly and are
+marked `expanded_lab`. They require the expanded topology with H1 and H2.
 
-The unit tests cover the Docker client and testbed configuration
-resolution. Integration tests include real Docker-based router discovery
-and TCP-probe diagnostics.
+Deploy that topology from Project 1, after stopping the baseline lab if
+required by available memory:
 
-The TCP-probe tests do not establish successful application-level TCP
-connections. Their results are diagnostic evidence about TCP probe
-responses.
+    cd ~/network-automation-platform
+    sudo containerlab destroy --topo topology/srl-lab.clab.yml
+    sudo containerlab deploy --topo topology/srl-expanded.clab.yml
+
+Then run the application tests from Project 2:
+
+    cd ~/network-test-validation-platform
+    pytest -q -m expanded_lab
+
+To inspect which tests will be selected without executing them:
+
+    pytest --collect-only -q -m expanded_lab
+
+Pytest markers select tests; they do not deploy, destroy, or switch
+Containerlab topologies. Automating topology lifecycle and the sequential
+execution of both groups is reserved for Milestone 10.
 
 ## 10. Run pyATS AEtest Suites
 
@@ -228,7 +258,7 @@ currently uses parsing tailored to the observed SR Linux CLI output.
 
 ## 11. Current Implementation Status
 
-### Milestone 1 — Test Environment and Project 1 Integration
+### Milestone 1 — Test Environment & Project 1 Integration
 
 Status: Complete.
 
@@ -238,9 +268,9 @@ Status: Complete.
 - Lab-readiness check
 - Setup documentation
 
-### Milestone 2 — pytest Framework and Testbed Foundation
+### Milestone 2 — pytest Framework & Initial Tests
 
-Status: Complete.
+Status: Foundation established.
 
 - Unit and integration test categories
 - pytest markers
@@ -251,26 +281,28 @@ Status: Complete.
 - Successful test selection using `pytest -m unit` and `pytest -m integration`
 - Separate pyATS AEtest execution for live network validation
 
-### Milestone 3 — Connectivity and Transport Validation
+### Milestone 3 — Connectivity & Transport Validation
+
+Status: Complete.
+
+- ICMP reachability and TCP-probe diagnostics
+- Command timeouts and failure diagnostics
+- Expanded-lab TCP and UDP application servers
+- Automated TCP/UDP request-response validation from H1 to H2
+- Baseline and expanded-lab tests separated using pytest markers
+
+### Milestone 4 — Testbed Abstraction & pyATS Integration
 
 Status: In progress.
 
-- Three ICMP connectivity cases verified through AEtest
-- TCP traceroute probes retained as diagnostics
-- Application-level TCP connectivity not yet verified
-- Dedicated TCP/UDP traffic endpoints not yet implemented
+- Native pyATS testbed defines R1, R2, and R3
+- Custom Docker connection adapter reuses the existing CLI runner
+- Native pyATS command execution verified on all three routers
+- Native pyATS connectivity validation passed
+- Structured interface-state validation passed using SR Linux JSON
+- Final regression, documentation, and commit review remain
 
-### Milestone 4 — Testbed and pyATS Integration
-
-Status: Initial integration verified.
-
-- pyATS AEtest runs YAML-driven network validation scenarios
-- pyATS 26.9 dependencies are pinned
-- Existing Docker-based CLI execution is reused
-- Native SR Linux Unicon support and built-in Genie parsing remain
-  unverified
-
-### Milestone 5 — Interfaces, Routing, Protocols, and Management
+### Milestone 5 — Interfaces, Routing, Protocols & Management
 
 Status: In progress.
 
@@ -282,11 +314,11 @@ Status: In progress.
 
 ### Remaining milestones
 
-6. Negative testing, failure recovery, and regression
-7. Traffic and performance testing
-8. Packet capture and troubleshooting
-9. Test reporting and quality metrics
-10. CI/CD and end-to-end validation
+6. Negative, Failure, Recovery & Regression Testing
+7. Traffic & Performance Testing
+8. Packet Capture & Troubleshooting
+9. Reporting & Quality Metrics
+10. CI/CD & End-to-End Validation
 
 These milestones remain planned until their functionality has been
 implemented and verified.

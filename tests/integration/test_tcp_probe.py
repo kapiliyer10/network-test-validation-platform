@@ -9,12 +9,13 @@ import yaml
 from src.cli_runner import run_router_cli_command
 
 
-DEFAULT_CONFIG_PATH = (
-    Path(__file__).resolve().parents[2] / "configs" / "lab.yaml"
-)
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 CONFIG_PATH = Path(
-    os.environ.get("NETWORK_TESTBED_CONFIG", str(DEFAULT_CONFIG_PATH))
+    os.environ.get(
+        "NETWORK_TESTBED_CONFIG",
+        str(PROJECT_ROOT / "configs" / "lab.yaml"),
+    )
 ).expanduser()
 
 with CONFIG_PATH.open(encoding="utf-8") as config_file:
