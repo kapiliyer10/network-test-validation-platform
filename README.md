@@ -293,7 +293,7 @@ Status: Complete.
 
 ### Milestone 4 — Testbed Abstraction & pyATS Integration
 
-Status: In progress.
+Status: Complete.
 
 - Native pyATS testbed defines R1, R2, and R3
 - Custom Docker connection adapter reuses the existing CLI runner
