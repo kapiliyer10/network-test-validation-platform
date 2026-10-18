@@ -164,7 +164,7 @@ Readiness alone does not prove that routing or connectivity works.
 
 ## 9. Run pytest
 
-The test suite covers two Containerlab topologies. Until Milestone 10
+The test suite covers two Containerlab topologies. Until Milestone 9
 automates deployment and cleanup, run the test group that matches the
 topology currently running. Do not run the entire suite with `pytest -q`
 when only one topology is deployed.
@@ -216,7 +216,7 @@ To inspect which tests will be selected without executing them:
 
 Pytest markers select tests; they do not deploy, destroy, or switch
 Containerlab topologies. Automating topology lifecycle and the sequential
-execution of both groups is reserved for Milestone 10.
+execution of both groups is reserved for Milestone 9.
 
 ## 10. Run pyATS AEtest Suites
 
@@ -291,7 +291,7 @@ Status: Complete.
 - Automated TCP/UDP request-response validation from H1 to H2
 - Baseline and expanded-lab tests separated using pytest markers
 
-### Milestone 4 — Testbed Abstraction & pyATS Integration
+### Milestone 4 — Testbed Abstraction & Native pyATS Integration
 
 Status: Complete.
 
@@ -300,25 +300,19 @@ Status: Complete.
 - Native pyATS command execution verified on all three routers
 - Native pyATS connectivity validation passed
 - Structured interface-state validation passed using SR Linux JSON
-- Final regression, documentation, and commit review remain
-
-### Milestone 5 — Interfaces, Routing, Protocols & Management
-
-Status: In progress.
-
-- Six Ethernet interface operational-state checks verified
-- Six expected OSPF neighbor adjacencies verified as FULL
-- Six OSPF-learned remote loopback routes validated
-- Additional protocol, management-interface, and VLAN validation
-  remains planned
+- Native pyATS LLDP validation passed for all six expected Ethernet neighbor relationships
+- Baseline pytest regression suite passed after LLDP integration
+- Existing AEtest suites also cover six Ethernet interface operational-state
+  checks, six OSPF neighbor adjacencies in FULL state, and six OSPF-learned
+  remote loopback routes
 
 ### Remaining milestones
 
-6. Negative, Failure, Recovery & Regression Testing
-7. Traffic & Performance Testing
-8. Packet Capture & Troubleshooting
-9. Reporting & Quality Metrics
-10. CI/CD & End-to-End Validation
+5. Negative, Failure, Recovery & Regression Testing
+6. Traffic & Performance Testing
+7. Packet Capture & Troubleshooting
+8. Reporting & Quality Metrics
+9. CI/CD & End-to-End Validation
 
 These milestones remain planned until their functionality has been
 implemented and verified.
