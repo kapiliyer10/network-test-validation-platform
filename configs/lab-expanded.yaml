@@ -164,3 +164,16 @@ udp_application_tests:
     port: 18081
     payload: NETWORK_VALIDATION
     expected_response: UDP_OK:NETWORK_VALIDATION
+
+iperf3_tests:
+  - name: H1_to_H2_tcp_10Mbps
+    client: H1
+    server: H2
+    destination: 10.0.24.2
+    port: 5201
+    duration_seconds: 10
+    interval_seconds: 1
+    target_bitrate_mbps: 10
+    tcp_mss_bytes: 1400
+    min_receiver_mbps: 9.0
+    max_retransmits: 20

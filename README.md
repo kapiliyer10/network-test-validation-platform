@@ -3,98 +3,181 @@
 ## 1. Project Overview
 
 The Network Test & Validation Platform is a Python-based framework for
-testing and validating network behavior in a controlled lab.
+validating network connectivity, protocol behavior, failure recovery, and
+traffic performance in a containerized Nokia SR Linux environment.
 
-It is separate from Project 1, the Network Automation & Programmability
+The platform is designed around a practical network quality assurance
+workflow: define expected behavior, execute tests against a live lab,
+compare observed results with expectations, and report failures with
+diagnostic evidence.
+
+It is a separate project from the Network Automation & Programmability
 Platform.
 
-- **Project 1** configures network devices, discovers device state,
-  detects configuration drift, and applies configuration.
-- **Project 2** validates connectivity, network behavior, protocol state,
-  failure recovery, and traffic performance, and collects test evidence.
+- **Project 1 — Network Automation:** discovers device state, manages
+  configuration, detects configuration drift, and applies changes.
+- **Project 2 — Network Validation:** checks whether the network behaves
+  as expected before, during, and after normal operations or failures.
 
-Project 2 reuses the existing Project 1 Containerlab environment. It does
-not duplicate Project 1's configuration management or network-state
-management systems.
+Project 2 reuses Project 1's network lab rather than duplicating its
+configuration-management and state-management systems.
 
 ## 2. Architecture
 
-The current test execution flow is:
+The platform combines two test execution approaches.
 
-    Test definitions in configs/lab.yaml
-                    |
-                    v
-             src/testbed.py
-                    |
-                    v
-             RouterDevice
-                    |
-                    v
-            src/cli_runner.py
-                    |
-                    v
-        Docker exec -> SR Linux CLI
-                    |
-                    v
-           Output validation
-                    |
-                    v
-              Test result
+### Router and protocol validation
 
-The `Testbed` abstraction resolves logical router names to the existing
-Docker containers. `RouterDevice` provides a common command-execution
-interface, and the existing CLI runner performs the actual interaction.
+    YAML test definitions / pyATS testbed
+                    |
+                    v
+            pytest or pyATS AEtest
+                    |
+                    v
+          Testbed and device abstraction
+                    |
+                    v
+            Docker CLI connection
+                    |
+                    v
+            Nokia SR Linux CLI
+                    |
+                    v
+        Parse output and validate state
+                    |
+                    v
+             Test result / evidence
 
-The implementation intentionally remains small. It does not recreate
-Project 1's inventory, discovery, configuration, or drift-detection
-architecture.
+The pytest framework handles conventional unit and integration tests.
+Native pyATS AEtest organizes structured network validation into test
+cases and sections. The testbed abstraction maps logical device names to
+the appropriate lab devices, while the shared CLI runner executes router
+commands through Docker.
+
+Validation includes connectivity, interface operational state, OSPF
+neighbor state, routing information, LLDP adjacencies, and controlled
+failure and recovery scenarios.
+
+### Traffic and performance validation
+
+    configs/lab-expanded.yaml
+                |
+                v
+        pytest performance test
+                |
+                v
+        H1: iperf3 client
+                |
+                v
+        R1 ------ R2
+                |
+                v
+        H2: iperf3 server
+                |
+                v
+    JSON measurements and assertions
+
+The expanded lab provides dedicated Linux traffic endpoints. The
+performance test generates TCP traffic with iperf3, collects structured
+JSON results, and checks receiver throughput and retransmissions against
+configurable thresholds.
+
+Keeping traffic generation on Linux endpoints allows the tests to measure
+the routed data path without requiring traffic-generation applications
+inside the Nokia routers.
 
 ## 3. Technology Stack
 
-Core:
-- Python 3.12
-- Linux
-- Git
-- Docker Engine and Docker SDK for Python
-- Containerlab
-- pytest
-- pyATS AEtest
-- PyYAML
+### Programming and test automation
 
-Network testing and troubleshooting:
-- ICMP connectivity tests
-- TCP-probe diagnostics
-- Interface operational-state, OSPF neighbor, and route validation
-- Planned iPerf3 traffic testing
-- Planned tcpdump and Wireshark analysis
+- **Python 3.12** — test logic, command execution, result parsing, and
+  reusable validation utilities.
+- **pytest** — unit tests, integration tests, fixtures, assertions, and
+  regression execution.
+- **pyATS AEtest** — structured network test cases and validation steps.
+- **PyYAML** — configuration-driven test definitions and lab settings.
 
-Native pyATS testbed loading and a custom Docker connection adapter
-have been verified against the baseline SR Linux lab. The adapter reuses
-the existing CLI runner and does not establish a persistent SSH session.
-Genie parsers are not used for SR Linux. Structured interface state is
-validated using native JSON output and Python's json module.
+### Network lab and execution
+
+- **Linux** — endpoint networking and diagnostic utilities.
+- **Docker Engine** — runs the router and Linux endpoint containers.
+- **Containerlab** — defines and deploys the network topologies.
+- **Nokia SR Linux CLI** — interface, routing, protocol, and connectivity
+  observations.
+- **iperf3** — TCP traffic generation and throughput measurement.
+
+### Validation coverage
+
+Implemented test areas include:
+
+- ICMP connectivity and expected negative connectivity.
+- TCP and UDP application-level request/response tests.
+- Ethernet interface operational-state validation.
+- OSPF neighbor and route validation.
+- LLDP adjacency validation.
+- Controlled link failure, OSPF failover, and recovery verification.
+- Initial automated TCP throughput testing using iperf3.
+
+Packet capture and deeper traffic troubleshooting with tcpdump and
+Wireshark remain planned extensions.
+
+The native pyATS testbed and custom Docker connection adapter have been
+verified against the baseline SR Linux lab. The adapter reuses the
+existing CLI runner instead of opening a persistent SSH session. Genie
+parsers are not used for SR Linux; structured state is validated using
+native JSON output and Python's JSON parser where applicable.
 
 ## 4. Relationship with Project 1
 
-Project 2 uses the existing three-router Project 1 lab:
+Project 1 owns the network automation implementation and the Containerlab
+topology definitions. Project 2 consumes the resulting lab as a test
+environment and validates its behavior.
 
-        R1
-       /  \
-      /    \
-     R2----R3
+Two lab profiles are used for different testing needs.
 
-The Docker containers are:
+### Baseline lab — `srl-lab`
+
+The baseline lab contains three Nokia SR Linux routers connected in a
+triangle:
+
+    R1 ------ R2
+     \        /
+      \      /
+        R3
+
+Its container names include:
 
     clab-srl-lab-R1
     clab-srl-lab-R2
     clab-srl-lab-R3
 
-Project 1 remains responsible for creating, configuring, and managing the
-network. Project 2 verifies behavior through tests.
+This profile supports router connectivity, interface, OSPF, LLDP, route,
+and failure/recovery validation.
 
-The repositories and Python environments are separate. The projects
-share the existing lab but maintain separate responsibilities,
-dependencies, source code, and test workflows.
+### Expanded lab — `srl-expanded`
+
+The expanded lab retains the three-router topology and adds two Linux
+traffic endpoints:
+
+    H1 ------ R1 ------ R2 ------ H2
+                \      /
+                 \ R3 /
+
+H1 connects to R1 using `10.0.14.2/30`, and H2 connects to R2 using
+`10.0.24.2/30`. The routers' interconnections provide the routed path
+between the endpoints.
+
+The expanded profile supports TCP and UDP application tests and the
+initial iperf3 performance test. Its container names use the
+`clab-srl-expanded-` prefix.
+
+The baseline and expanded profiles are run separately when local resource
+constraints prevent both labs from running simultaneously. Tests must
+target the lab profile they are configured to use.
+
+The repositories maintain separate responsibilities, source code,
+dependencies, and test workflows. Project 1 manages the network;
+Project 2 measures and validates its behavior.
 
 ## 5. Prerequisites
 
@@ -107,7 +190,7 @@ Before running Project 2, ensure that:
 
 The Docker Python package does not install or start Docker Engine.
 
-## 6. Start the Project 1 Lab
+## 6. Start the Baseline Project 1 Lab
 
 From the Project 1 repository:
 
@@ -176,13 +259,15 @@ The baseline `srl-lab` contains R1, R2, and R3.
     unset NETWORK_TESTBED_CONFIG
     pytest -q -m "not expanded_lab"
 
-Most recently verified result:
+Last recorded baseline result before the iperf3 performance test was added:
 
-    17 passed, 2 deselected
+```text
+19 passed, 2 deselected
+```
 
-The two deselected tests are the expanded-lab TCP and UDP application
-tests. The baseline suite includes unit tests and router-only integration
-tests, including TCP-probe diagnostics.
+This result predates the addition of the iperf3 performance test. The `expanded_lab` marker now selects three tests: TCP application validation, UDP application validation, and iperf3 performance testing.
+
+Refresh the baseline result with `srl-lab` running before treating it as the current verified result.
 
 Run unit tests independently:
 
@@ -193,30 +278,89 @@ Run baseline integration tests independently:
     unset NETWORK_TESTBED_CONFIG
     pytest -q -m "integration and not expanded_lab"
 
-### Run the expanded-lab TCP and UDP application tests
+### Run the Expanded-Lab Application and Performance Tests
 
-The application tests use `configs/lab-expanded.yaml` directly and are
-marked `expanded_lab`. They require the expanded topology with H1 and H2.
+The expanded-lab tests require the `srl-expanded` topology with three Nokia SR Linux routers and two Linux endpoints, H1 and H2.
 
-Deploy that topology from Project 1, after stopping the baseline lab if
-required by available memory:
+These tests cover:
 
-    cd ~/network-automation-platform
-    sudo containerlab destroy --topo topology/srl-lab.clab.yml
-    sudo containerlab deploy --topo topology/srl-expanded.clab.yml
+- TCP application-level request/response validation.
+- UDP application-level request/response validation.
+- TCP throughput measurement using iperf3.
 
-Then run the application tests from Project 2:
+#### 1. Prepare the expanded lab
 
-    cd ~/network-test-validation-platform
-    pytest -q -m expanded_lab
+If the baseline `srl-lab` is running and your system cannot accommodate both labs, stop it first.
 
-To inspect which tests will be selected without executing them:
+From the Project 1 repository:
 
-    pytest --collect-only -q -m expanded_lab
+```bash
+cd ~/network-automation-platform
+./scripts/lab_down.sh
+```
 
-Pytest markers select tests; they do not deploy, destroy, or switch
-Containerlab topologies. Automating topology lifecycle and the sequential
-execution of both groups is reserved for Milestone 9.
+Build the endpoint image. This image includes the networking utilities, TCP/UDP application servers, and iperf3.
+
+```bash
+docker build -t network-test-endpoint:1.0 topology/tcp-endpoint
+```
+
+Deploy the expanded topology:
+
+```bash
+./scripts/lab_expanded_up.sh
+```
+
+The expanded topology configures the H1 and H2 interfaces with an MTU of 1500 bytes. It also starts the iperf3 server on H2.
+
+#### 2. Run the expanded-lab test group
+
+Activate the Project 2 virtual environment and run:
+
+```bash
+cd ~/network-test-validation-platform
+source .venv/bin/activate
+pytest -q -m expanded_lab
+```
+
+This selects the TCP application, UDP application, and iperf3 performance tests.
+
+To inspect the selected tests without executing them:
+
+```bash
+pytest --collect-only -q -m expanded_lab
+```
+
+#### 3. Run only the iperf3 performance test
+
+To run the performance test independently and display its measured throughput and TCP retransmissions:
+
+```bash
+pytest -v -s tests/integration/test_iperf3_performance.py
+```
+
+The initial automated test uses a configurable 10 Mbps target, a 10-second duration, and a TCP maximum segment size of 1400 bytes. It checks that receiver throughput reaches at least 9 Mbps and retransmissions do not exceed the configured limit of 20.
+
+These are initial thresholds for the controlled lab, not production performance requirements.
+
+One verified run reported 10.06 Mbps at the receiver with two TCP retransmissions. Exploratory higher-rate tests showed some variability, so the maximum sustainable throughput has not yet been established.
+
+#### 4. Stop the expanded lab
+
+After testing, stop the expanded topology:
+
+```bash
+cd ~/network-automation-platform
+./scripts/lab_expanded_down.sh
+```
+
+To return to the baseline lab:
+
+```bash
+./scripts/lab_up.sh
+```
+
+The baseline and expanded labs are separate execution environments. Pytest markers select tests; they do not deploy, destroy, or switch topologies. Automating the lifecycle and sequential execution of both lab profiles remains part of Milestone 9.
 
 ## 10. Run pyATS AEtest Suites
 
@@ -277,7 +421,6 @@ Status: Foundation established.
 - YAML-based lab and test definitions
 - Reusable Testbed and RouterDevice abstractions
 - Unit tests for testbed resolution and validation
-- 10 pytest tests collected and passing: 6 unit and 4 integration
 - Successful test selection using `pytest -m unit` and `pytest -m integration`
 - Separate pyATS AEtest execution for live network validation
 
@@ -310,26 +453,42 @@ Status: Complete.
 
 Status: In progress.
 
-- Negative connectivity validation using native pyATS
-- Expected packet loss verified from SR Linux ping statistics
-- CLI runner supports explicit handling of expected non-zero exit codes
-- Unit tests cover optional return-code handling
-- Controlled R1-R2 interface failure tested using a confirmed commit
-- OSPF failover validated by checking the route to R2's loopback through R3
-- Failover convergence checked against a configurable timeout
-- Recovery verified through interface-state checks, bounded ping retries,
-  and restoration of the preferred direct OSPF route through R2
-- Additional failure, recovery, and regression scenarios remain planned
+- Negative connectivity validation using native pyATS.
+- Expected packet loss verified from SR Linux ping statistics.
+- CLI runner supports explicit handling of expected non-zero exit codes.
+- Unit tests cover optional return-code handling.
+- Controlled R1–R2 interface failure tested using a confirmed commit.
+- OSPF failover validated by checking the route to R2's loopback through R3.
+- Failover convergence checked against a configurable timeout.
+- Recovery verified through interface-state checks, bounded ping retries, and restoration of the preferred direct OSPF route through R2.
+- Cleanup enters candidate-private mode before issuing `tools system configuration confirmed-reject`.
+- Immediate cancellation of the confirmed-commit timer remains unverified. The cleanup output warned that the rollback timer was still in progress, and recovery was verified before the five-minute timer expired.
+- Additional failure, recovery, and regression scenarios remain planned.
+
+### Milestone 6 — Traffic & Performance Testing
+
+Status: In progress.
+
+- Added `iperf3` to the custom `network-test-endpoint:1.0` Docker image.
+- Expanded topology configures H1 and H2 with a 1500-byte interface MTU.
+- H2 starts the `iperf3` server during expanded-lab deployment.
+- Added a configuration-driven pytest performance test using iperf3 JSON output.
+- The test checks receiver throughput and TCP retransmissions against configurable thresholds.
+- The initial automated profile uses a 10 Mbps target, a 10-second duration, an MSS of 1400 bytes, a minimum receiver throughput of 9 Mbps, and a maximum of 20 retransmissions.
+
+A verified automated run reported 10.06 Mbps at the receiver with two TCP retransmissions and passed the configured assertions.
+
+Exploratory higher-rate tests showed variability. Two 50 Mbps runs achieved 50 Mbps with six retransmissions each, while another achieved 31.8 Mbps with 248 retransmissions. The maximum sustainable throughput has not been established.
+
+Further repeatability testing, additional performance profiles, and UDP performance measurements remain planned.
 
 ### Remaining milestones
 
-6. Traffic & Performance Testing
 7. Packet Capture & Troubleshooting
 8. Reporting & Quality Metrics
 9. CI/CD & End-to-End Validation
 
-These milestones remain planned until their functionality has been
-implemented and verified.
+These milestones remain planned until their functionality has been implemented and verified.
 
 ## 12. Development Principles
 
