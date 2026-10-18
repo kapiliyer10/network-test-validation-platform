@@ -19,7 +19,7 @@ with CONFIG_PATH.open(encoding="utf-8") as config_file:
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "test_case",
-    LAB_CONFIG.get("iperf3_tests", []),
+    LAB_CONFIG.get("iperf3_tcp_tests", []),
     ids=lambda test_case: test_case["name"],
 )
 def test_iperf3_tcp_throughput(test_case):

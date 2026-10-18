@@ -165,7 +165,7 @@ udp_application_tests:
     payload: NETWORK_VALIDATION
     expected_response: UDP_OK:NETWORK_VALIDATION
 
-iperf3_tests:
+iperf3_tcp_tests:
   - name: H1_to_H2_tcp_10Mbps
     client: H1
     server: H2
@@ -177,3 +177,40 @@ iperf3_tests:
     tcp_mss_bytes: 1400
     min_receiver_mbps: 9.0
     max_retransmits: 20
+
+  - name: H1_to_H2_tcp_25Mbps
+    client: H1
+    server: H2
+    destination: 10.0.24.2
+    port: 5201
+    duration_seconds: 10
+    interval_seconds: 1
+    target_bitrate_mbps: 25
+    tcp_mss_bytes: 1400
+    min_receiver_mbps: 22.5
+    max_retransmits: 20
+
+  - name: H1_to_H2_tcp_50Mbps
+    client: H1
+    server: H2
+    destination: 10.0.24.2
+    port: 5201
+    duration_seconds: 10
+    interval_seconds: 1
+    target_bitrate_mbps: 50
+    tcp_mss_bytes: 1400
+    min_receiver_mbps: 45.0
+    max_retransmits: 20
+
+iperf3_udp_tests:
+  - name: H1_to_H2_udp_10Mbps
+    client: H1
+    server: H2
+    destination: 10.0.24.2
+    port: 5201
+    duration_seconds: 10
+    interval_seconds: 1
+    target_bitrate_mbps: 10
+    min_receiver_mbps: 9.0
+    max_loss_percent: 0.1
+    max_jitter_ms: 1.0

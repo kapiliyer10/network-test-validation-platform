@@ -469,18 +469,50 @@ Status: In progress.
 
 Status: In progress.
 
-- Added `iperf3` to the custom `network-test-endpoint:1.0` Docker image.
-- Expanded topology configures H1 and H2 with a 1500-byte interface MTU.
-- H2 starts the `iperf3` server during expanded-lab deployment.
-- Added a configuration-driven pytest performance test using iperf3 JSON output.
-- The test checks receiver throughput and TCP retransmissions against configurable thresholds.
-- The initial automated profile uses a 10 Mbps target, a 10-second duration, an MSS of 1400 bytes, a minimum receiver throughput of 9 Mbps, and a maximum of 20 retransmissions.
+#### TCP performance validation
 
-A verified automated run reported 10.06 Mbps at the receiver with two TCP retransmissions and passed the configured assertions.
+- Added three configuration-driven TCP performance profiles using iperf3: 10 Mbps, 25 Mbps, and 50 Mbps.
+- The pytest test uses iperf3 JSON output to validate receiver throughput and TCP retransmissions.
+- Each profile specifies its target bitrate, test duration, TCP MSS, minimum receiver throughput, and maximum retransmission count.
+- The three profiles passed their individual repeatability checks. Receiver throughput remained close to the target rates under the current expanded-lab conditions.
 
-Exploratory higher-rate tests showed variability. Two 50 Mbps runs achieved 50 Mbps with six retransmissions each, while another achieved 31.8 Mbps with 248 retransmissions. The maximum sustainable throughput has not been established.
+Representative repeatability results:
 
-Further repeatability testing, additional performance profiles, and UDP performance measurements remain planned.
+| Target bitrate | Receiver throughput observed | Retransmissions observed |
+| -------------- | ---------------------------: | -----------------------: |
+| 10 Mbps        |              9.96–10.07 Mbps |                      1–4 |
+| 25 Mbps        |                   25.06 Mbps |                      4–5 |
+| 50 Mbps        |             49.90–50.01 Mbps |                      7–8 |
+
+An earlier exploratory 50 Mbps run exhibited substantial degradation, with 31.8 Mbps receiver throughput and 248 retransmissions. Subsequent runs were stable, but the earlier observation demonstrates that performance variability should not be ignored.
+
+#### UDP performance validation
+
+- Added a separate configuration-driven UDP performance test using iperf3.
+- The test validates receiver throughput, packet loss, and jitter using structured JSON results.
+- The initial UDP profile targets 10 Mbps for 10 seconds, with a minimum receiver throughput of 9 Mbps, maximum packet loss of 0.1%, and maximum jitter of 1 ms.
+- Three automated runs passed, each reporting approximately 10 Mbps receiver throughput and zero packet loss. Measured jitter ranged from 0.034 to 0.092 ms across those runs.
+
+#### Integration and regression validation
+
+The expanded-lab test group now contains six tests:
+
+- TCP application request/response validation.
+- UDP application request/response validation.
+- TCP performance profiles at 10, 25, and 50 Mbps.
+- UDP performance testing at 10 Mbps.
+
+The expanded-lab suite passed all six tests, with 19 unrelated tests deselected by the `expanded_lab` marker.
+
+The focused regression suite covering unit tests, TCP/UDP application tests, and all TCP/UDP performance profiles passed:
+
+```text
+21 passed in 41.89s
+```
+
+These results validate the initial performance profiles under the current containerized lab conditions. They do not establish maximum network capacity or production-network performance limits.
+
+Further work includes additional UDP traffic profiles, controlled packet-loss and jitter testing, investigation of high-rate variability, and integration with the reporting and CI/CD milestones.
 
 ### Remaining milestones
 
