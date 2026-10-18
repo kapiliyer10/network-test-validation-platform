@@ -174,3 +174,11 @@ lldp_neighbor_tests:
     local_interface: ethernet-1/2
     expected_neighbor: R1
     expected_neighbor_port: ethernet-1/2
+
+negative_connectivity_tests:
+  - name: R1_to_unreachable_documentation_address
+    source: R1
+    destination: 192.0.2.1
+    expected_transmitted: 3
+    expected_received: 0
+    expected_packet_loss_percent: 100

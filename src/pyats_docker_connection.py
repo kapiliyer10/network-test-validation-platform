@@ -100,7 +100,12 @@ class DockerSRLConnection(BaseConnection):
         self._connected = False
 
     @BaseConnection.locked
-    def execute(self, command, timeout=30.0):
+    def execute(
+        self,
+        command,
+        timeout=30.0,
+        check_returncode=True,
+    ):
         """Execute one SR Linux CLI command."""
 
         if not self.connected:
@@ -112,4 +117,5 @@ class DockerSRLConnection(BaseConnection):
             container_name=self.container_name,
             command=command,
             timeout=timeout,
+            check_returncode=check_returncode,
         )

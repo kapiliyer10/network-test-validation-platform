@@ -20,6 +20,7 @@ def run_router_cli_command(
     container_name: str,
     command: str,
     timeout: float = 30.0,
+    check_returncode: bool = True,
 ) -> str:
     """Execute one SR Linux CLI command and return its output."""
 
@@ -85,7 +86,7 @@ def run_router_cli_command(
     stderr = _stream_text(result.stderr).strip()
     output = "\n".join(part for part in (stdout, stderr) if part)
 
-    if result.returncode != 0:
+    if check_returncode and result.returncode != 0:
         raise CLIRunnerError(
             f"CLI execution failed.\n"
             f"Router container: {container_name}\n"

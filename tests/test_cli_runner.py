@@ -125,3 +125,31 @@ def test_nonpositive_timeout_is_rejected():
             "show interface",
             timeout=0,
         )
+
+
+@pytest.mark.unit
+def test_nonzero_exit_can_return_expected_network_failure(monkeypatch):
+    ping_output = (
+        "PING 192.0.2.1 (192.0.2.1) 56(84) bytes of data.\n"
+        "--- 192.0.2.1 ping statistics ---\n"
+        "3 packets transmitted, 0 received, 100% packet loss"
+    )
+
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=1,
+            stdout=ping_output,
+            stderr="",
+        ),
+    )
+
+    output = run_router_cli_command(
+        "clab-srl-lab-R1",
+        "ping 192.0.2.1 network-instance default -c 3",
+        check_returncode=False,
+    )
+
+    assert "3 packets transmitted, 0 received" in output
+    assert "100% packet loss" in output
