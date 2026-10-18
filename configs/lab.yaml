@@ -190,3 +190,10 @@ failure_recovery_tests:
     destination: 10.0.12.2
     expected_packets: 3
     rollback_timeout_seconds: 300
+
+    failover_destination: 10.255.0.2
+    expected_failover_next_hop: 10.0.31.2
+    expected_failover_interface: ethernet-1/2.0
+    expected_recovery_next_hop: 10.0.12.2
+    expected_recovery_interface: ethernet-1/1.0
+    convergence_timeout_seconds: 60
