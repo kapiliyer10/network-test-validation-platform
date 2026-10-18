@@ -306,9 +306,18 @@ Status: Complete.
   checks, six OSPF neighbor adjacencies in FULL state, and six OSPF-learned
   remote loopback routes
 
+### Milestone 5 — Negative, Failure, Recovery & Regression Testing
+
+Status: In progress.
+
+- Negative connectivity validation using native pyATS
+- Expected packet loss verified from SR Linux ping statistics
+- CLI runner supports explicit handling of expected non-zero exit codes
+- Unit tests cover the optional return-code behavior
+- Additional failure, recovery, and regression scenarios remain planned
+
 ### Remaining milestones
 
-5. Negative, Failure, Recovery & Regression Testing
 6. Traffic & Performance Testing
 7. Packet Capture & Troubleshooting
 8. Reporting & Quality Metrics
