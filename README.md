@@ -315,7 +315,10 @@ Status: In progress.
 - CLI runner supports explicit handling of expected non-zero exit codes
 - Unit tests cover optional return-code handling
 - Controlled R1-R2 interface failure tested using a confirmed commit
-- Recovery verified through interface-state checks and bounded ping retries
+- OSPF failover validated by checking the route to R2's loopback through R3
+- Failover convergence checked against a configurable timeout
+- Recovery verified through interface-state checks, bounded ping retries,
+  and restoration of the preferred direct OSPF route through R2
 - Additional failure, recovery, and regression scenarios remain planned
 
 ### Remaining milestones
