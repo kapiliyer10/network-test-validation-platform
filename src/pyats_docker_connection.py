@@ -4,7 +4,10 @@ import subprocess
 
 from pyats.connections import BaseConnection
 
-from src.cli_runner import run_router_cli_command
+from src.cli_runner import (
+    run_router_cli_command,
+    run_router_cli_commands,
+)
 
 
 class DockerSRLConnection(BaseConnection):
@@ -118,4 +121,19 @@ class DockerSRLConnection(BaseConnection):
             command=command,
             timeout=timeout,
             check_returncode=check_returncode,
+        )
+
+    @BaseConnection.locked
+    def execute_commands(self, commands, timeout=30.0):
+        """Execute multiple SR Linux CLI commands in one session."""
+
+        if not self.connected:
+            raise RuntimeError(
+                "Connect the pyATS device before executing commands"
+            )
+
+        return run_router_cli_commands(
+            container_name=self.container_name,
+            commands=commands,
+            timeout=timeout,
         )

@@ -182,3 +182,11 @@ negative_connectivity_tests:
     expected_transmitted: 3
     expected_received: 0
     expected_packet_loss_percent: 100
+
+failure_recovery_tests:
+  - name: R1_R2_link_failure_and_recovery
+    router: R1
+    interface: ethernet-1/1
+    destination: 10.0.12.2
+    expected_packets: 3
+    rollback_timeout_seconds: 300
