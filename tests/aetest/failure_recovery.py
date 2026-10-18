@@ -340,6 +340,7 @@ class FailureRecoveryValidation(aetest.Testcase):
                     try:
                         rollback_output = connection.execute_commands(
                             [
+                                "enter candidate private",
                                 "tools system configuration confirmed-reject",
                             ],
                             timeout=30,
