@@ -8,6 +8,7 @@ import pytest
 from src.cli_runner import (
     CLIRunnerError,
     run_router_cli_command,
+    run_router_cli_commands,
 )
 
 
@@ -153,3 +154,32 @@ def test_nonzero_exit_can_return_expected_network_failure(monkeypatch):
 
     assert "3 packets transmitted, 0 received" in output
     assert "100% packet loss" in output
+
+
+@pytest.mark.unit
+def test_multiple_commands_run_in_one_session(monkeypatch):
+    def fake_run(args, **kwargs):
+        assert args == [
+            "docker", "exec", "-i", "clab-srl-lab-R1", "sr_cli"
+        ]
+        assert kwargs["input"] == (
+            "show version\n"
+            "show interface\n"
+            "quit\n"
+        )
+
+        return SimpleNamespace(
+            returncode=0,
+            stdout="SR Linux version\nethernet-1/1 is up",
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    output = run_router_cli_commands(
+        "clab-srl-lab-R1",
+        ["show version", "show interface"],
+    )
+
+    assert "SR Linux version" in output
+    assert "ethernet-1/1 is up" in output

@@ -1,7 +1,7 @@
 """Execute SR Linux CLI commands through Docker."""
 
 import subprocess
-
+from collections.abc import Sequence
 
 class CLIRunnerError(RuntimeError):
     """Raised when a CLI command cannot be executed successfully."""
@@ -101,6 +101,102 @@ def run_router_cli_command(
             f"SR Linux CLI reported a parsing error.\n"
             f"Router container: {container_name}\n"
             f"Command: {command}\n"
+            f"Output:\n{output}"
+        )
+
+    return output
+
+def run_router_cli_commands(
+    container_name: str,
+    commands: Sequence[str],
+    timeout: float = 30.0,
+) -> str:
+    """Execute multiple validated CLI commands in one Docker session."""
+
+    if not container_name.strip():
+        raise ValueError("container_name must not be empty")
+
+    if isinstance(commands, str) or not commands:
+        raise ValueError("commands must be a non-empty sequence")
+
+    for command in commands:
+        if not isinstance(command, str) or not command.strip():
+            raise ValueError("Each command must be a non-empty string")
+
+        if "\n" in command or "\r" in command:
+            raise ValueError("Each command must be on a single line")
+
+    if timeout <= 0:
+        raise ValueError("timeout must be greater than zero")
+
+    command_description = "; ".join(commands)
+    input_text = "\n".join([*commands, "quit"]) + "\n"
+
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                container_name,
+                "sr_cli",
+            ],
+            input=input_text,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+
+    except subprocess.TimeoutExpired as exc:
+        partial_output = "\n".join(
+            part
+            for part in (
+                _stream_text(exc.stdout).strip(),
+                _stream_text(exc.stderr).strip(),
+            )
+            if part
+        )
+
+        detail = (
+            f"\nPartial output:\n{partial_output}"
+            if partial_output
+            else ""
+        )
+
+        raise CLIRunnerError(
+            f"CLI command sequence timed out after {timeout:g} seconds.\n"
+            f"Router container: {container_name}\n"
+            f"Commands: {command_description}{detail}"
+        ) from exc
+
+    except OSError as exc:
+        raise CLIRunnerError(
+            "Could not execute Docker while running CLI commands.\n"
+            f"Router container: {container_name}\n"
+            f"Commands: {command_description}\n"
+            f"Reason: {exc}"
+        ) from exc
+
+    stdout = _stream_text(result.stdout).strip()
+    stderr = _stream_text(result.stderr).strip()
+    output = "\n".join(part for part in (stdout, stderr) if part)
+
+    if result.returncode != 0:
+        raise CLIRunnerError(
+            f"CLI command sequence failed.\n"
+            f"Router container: {container_name}\n"
+            f"Commands: {command_description}\n"
+            f"Exit code: {result.returncode}\n"
+            f"stdout:\n{stdout}\n"
+            f"stderr:\n{stderr}"
+        )
+
+    if "Parsing error:" in output:
+        raise CLIRunnerError(
+            "SR Linux CLI reported a parsing error.\n"
+            f"Router container: {container_name}\n"
+            f"Commands: {command_description}\n"
             f"Output:\n{output}"
         )
 
