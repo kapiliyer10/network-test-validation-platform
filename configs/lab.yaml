@@ -137,3 +137,40 @@ route_tests:
     expected_next_hop: 10.0.23.1
     expected_interface: ethernet-1/1.0
     expected_best: true
+
+lldp_neighbor_tests:
+  - name: R1_ethernet_1_1_to_R2_ethernet_1_1
+    router: R1
+    local_interface: ethernet-1/1
+    expected_neighbor: R2
+    expected_neighbor_port: ethernet-1/1
+
+  - name: R1_ethernet_1_2_to_R3_ethernet_1_2
+    router: R1
+    local_interface: ethernet-1/2
+    expected_neighbor: R3
+    expected_neighbor_port: ethernet-1/2
+
+  - name: R2_ethernet_1_1_to_R1_ethernet_1_1
+    router: R2
+    local_interface: ethernet-1/1
+    expected_neighbor: R1
+    expected_neighbor_port: ethernet-1/1
+
+  - name: R2_ethernet_1_2_to_R3_ethernet_1_1
+    router: R2
+    local_interface: ethernet-1/2
+    expected_neighbor: R3
+    expected_neighbor_port: ethernet-1/1
+
+  - name: R3_ethernet_1_1_to_R2_ethernet_1_2
+    router: R3
+    local_interface: ethernet-1/1
+    expected_neighbor: R2
+    expected_neighbor_port: ethernet-1/2
+
+  - name: R3_ethernet_1_2_to_R1_ethernet_1_2
+    router: R3
+    local_interface: ethernet-1/2
+    expected_neighbor: R1
+    expected_neighbor_port: ethernet-1/2
