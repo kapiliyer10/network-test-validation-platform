@@ -313,7 +313,9 @@ Status: In progress.
 - Negative connectivity validation using native pyATS
 - Expected packet loss verified from SR Linux ping statistics
 - CLI runner supports explicit handling of expected non-zero exit codes
-- Unit tests cover the optional return-code behavior
+- Unit tests cover optional return-code handling
+- Controlled R1-R2 interface failure tested using a confirmed commit
+- Recovery verified through interface-state checks and bounded ping retries
 - Additional failure, recovery, and regression scenarios remain planned
 
 ### Remaining milestones
