@@ -239,3 +239,13 @@ latency_impairment_tests:
     base_profile: H1_to_H2_icmp_latency
     delay_ms: 20
     min_observed_avg_rtt_ms: 15.0
+
+# Controlled delay variation for UDP jitter validation.
+iperf3_udp_jitter_tests:
+  - name: H1_to_H2_udp_jitter_with_5ms_variation
+    base_profile: H1_to_H2_udp_10Mbps
+    interface: eth1
+    target_bitrate_mbps: 1
+    base_delay_ms: 20
+    delay_variation_ms: 5
+    min_observed_jitter_ms: 1.0

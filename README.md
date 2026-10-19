@@ -355,26 +355,21 @@ Run the TCP performance profiles at 10, 25, and 50 Mbps:
 pytest -v -s tests/integration/test_iperf3_performance.py
 ```
 
-Run the UDP performance test, which checks throughput, packet loss, and jitter:
+Run the consolidated UDP performance, packet-loss, and jitter tests:
 
 ```bash
-pytest -v -s tests/integration/test_iperf3_udp_performance.py
+pytest -v -s tests/integration/test_iperf3_udp.py
 ```
 
-Run the controlled UDP packet-loss detection test:
+This module contains three scenarios: normal UDP performance, controlled
+packet-loss detection, and controlled jitter detection. The impairment tests
+temporarily apply `tc netem` rules to H1's `eth1` egress interface and verify
+that the measured impairment exceeds its configured threshold.
 
-```bash
-pytest -v -s tests/integration/test_iperf3_udp_impairment.py
-```
-
-The impairment test temporarily applies a 1% `tc netem` packet-loss rule to
-H1's `eth1` egress interface. It passes when measured packet loss exceeds
-0.1% and verifies that the interface returns to its original `noqueue` state.
-
-Run this impairment test only in the controlled expanded lab, not on a
-production network or while unrelated traffic uses that interface. If cleanup
-fails or the interface state is unexpected, stop and investigate before
-running more tests.
+Run these impairment tests only in the controlled expanded lab, not on a
+production network or while unrelated traffic uses the interface. If cleanup
+fails or an unexpected interface state is reported, stop and investigate
+before running more tests.
 
 Run the baseline and controlled-delay ICMP latency tests:
 
@@ -555,6 +550,18 @@ An earlier exploratory 50 Mbps run exhibited substantial degradation, with 31.8 
 The impairment test is intended for the controlled test lab only. Do not run
 it on a production network or while unrelated traffic uses the interface.
 
+#### Controlled UDP jitter validation
+
+- Added a configuration-driven jitter scenario to the consolidated UDP test module.
+- The test applies 20 ms of base delay with 5 ms of delay variation to H1's `eth1` egress interface.
+- UDP traffic runs at a configured 1 Mbps target for the experiment.
+- A verified run measured 0.999 Mbps receiver throughput, 2.905 ms jitter, and 0% packet loss (0/864 packets).
+- The test passed its minimum-jitter requirement of 1.0 ms and verified that the interface returned to `qdisc noqueue`.
+
+Run this controlled experiment only in the expanded test lab. It temporarily
+changes traffic handling on H1 and must not run on a production network or
+while unrelated traffic uses the affected interface.
+
 #### ICMP latency and controlled delay validation
 
 - Added a configuration-driven ICMP latency test using BusyBox `ping`.
@@ -576,25 +583,25 @@ uses the affected interface.
 
 #### Integration and regression validation
 
-The expanded-lab test group now contains nine tests:
+The expanded-lab test group now contains ten tests:
 
 - TCP and UDP application request/response validation.
 - TCP performance profiles at 10, 25, and 50 Mbps.
-- UDP performance testing at 10 Mbps.
-- Automated UDP packet-loss detection and cleanup.
+- Three UDP scenarios in `test_iperf3_udp.py`: normal performance, packet-loss detection, and jitter detection.
 - Baseline ICMP latency validation.
 - Controlled ICMP delay detection and cleanup.
 
-Before the latency tests were added, an expanded-lab run passed:
+Before the UDP jitter scenario was added, the expanded-lab suite passed:
 
 ```text
-7 passed, 19 deselected in 51.93s
+9 passed, 19 deselected in 54.96s
 ```
 
-After adding the latency tests, the recommended regression command passed:
+After consolidating the UDP scenarios and adding jitter detection, the
+recommended regression command passed:
 
 ```text
-24 passed, 4 deselected in 54.75s
+25 passed, 4 deselected in 65.72s
 ```
 
 The regression command is:
