@@ -290,7 +290,7 @@ Run baseline integration tests independently:
     unset NETWORK_TESTBED_CONFIG
     pytest -q -m "integration and not expanded_lab"
 
-### Run the Expanded-Lab Application and Performance Tests
+### Run the Expanded-Lab Application, Performance, and Latency Tests
 
 The expanded-lab tests require the `srl-expanded` topology with three Nokia SR Linux routers and two Linux endpoints, H1 and H2.
 
@@ -301,6 +301,8 @@ These tests cover:
 - TCP throughput profiles at 10, 25, and 50 Mbps using iperf3.
 - UDP throughput, packet-loss, and jitter validation using iperf3.
 - Controlled UDP packet-loss detection and cleanup.
+- ICMP round-trip latency and packet-loss validation.
+- Controlled 20 ms delay detection and cleanup.
 
 #### 1. Prepare the expanded lab
 
@@ -369,9 +371,27 @@ The impairment test temporarily applies a 1% `tc netem` packet-loss rule to
 H1's `eth1` egress interface. It passes when measured packet loss exceeds
 0.1% and verifies that the interface returns to its original `noqueue` state.
 
-Run this test only in the controlled expanded lab, not on a production network
-or while unrelated traffic uses that interface. If cleanup fails or the
-interface state is unexpected, stop and investigate before running more tests.
+Run this impairment test only in the controlled expanded lab, not on a
+production network or while unrelated traffic uses that interface. If cleanup
+fails or the interface state is unexpected, stop and investigate before
+running more tests.
+
+Run the baseline and controlled-delay ICMP latency tests:
+
+```bash
+pytest -v -s tests/integration/test_latency.py
+```
+
+The baseline test uses BusyBox `ping` to measure minimum, average, and maximum
+round-trip time (RTT), as well as packet loss. Its configured limits are an
+average RTT of at most 10 ms and zero packet loss.
+
+The controlled-delay test adds 20 ms of delay to traffic leaving H1's `eth1`
+interface. It checks that the measured average RTT reaches at least 15 ms and
+verifies that the interface returns to its original `noqueue` state afterward.
+Run this test only in the controlled expanded lab. If cleanup fails or an
+unexpected interface state is reported, stop and investigate before running
+more tests.
 
 These thresholds are for the controlled lab, not production performance
 requirements.
@@ -535,36 +555,61 @@ An earlier exploratory 50 Mbps run exhibited substantial degradation, with 31.8 
 The impairment test is intended for the controlled test lab only. Do not run
 it on a production network or while unrelated traffic uses the interface.
 
+#### ICMP latency and controlled delay validation
+
+- Added a configuration-driven ICMP latency test using BusyBox `ping`.
+- The baseline test checks minimum, average, and maximum RTT, plus packet loss.
+- The baseline profile requires an average RTT of at most 10 ms and zero packet loss.
+- Added a controlled-delay test that applies a temporary 20 ms delay to H1's `eth1` egress interface.
+- The impairment test passes when average RTT reaches at least 15 ms and verifies that the interface returns to `qdisc noqueue` during cleanup.
+
+Verified results:
+
+| Scenario | RTT result | Packet loss | Result |
+| --- | --- | --- | --- |
+| Baseline | Min 0.750 ms, avg 1.001 ms, max 1.266 ms | 0% (5/5 replies) | Passed |
+| 20 ms added delay | Average 21.032 ms | 0% | Passed |
+
+The controlled-delay test changes the running lab temporarily. Use it only in
+the expanded test lab, not on a production network or while unrelated traffic
+uses the affected interface.
+
 #### Integration and regression validation
 
-The expanded-lab test group now contains seven tests:
+The expanded-lab test group now contains nine tests:
 
-- TCP application request/response validation.
-- UDP application request/response validation.
+- TCP and UDP application request/response validation.
 - TCP performance profiles at 10, 25, and 50 Mbps.
 - UDP performance testing at 10 Mbps.
 - Automated UDP packet-loss detection and cleanup.
+- Baseline ICMP latency validation.
+- Controlled ICMP delay detection and cleanup.
 
-The expanded-lab suite passed:
+Before the latency tests were added, an expanded-lab run passed:
 
 ```text
 7 passed, 19 deselected in 51.93s
 ```
 
-The focused regression suite, including unit tests, application tests, TCP/UDP
-performance tests, and the new impairment test, passed:
+After adding the latency tests, the recommended regression command passed:
 
 ```text
-22 passed in 52.56s
+24 passed, 4 deselected in 54.75s
+```
+
+The regression command is:
+
+```bash
+pytest -q -m "expanded_lab or not integration"
 ```
 
 These results validate the configured tests under the current containerized
 lab conditions. They do not establish maximum network capacity or production
 performance limits.
 
-Further work includes additional UDP profiles, controlled delay and jitter
-scenarios, investigation of high-rate variability, and integration with the
-reporting and CI/CD milestones.
+Further work includes additional UDP profiles, more controlled delay and
+jitter scenarios, investigation of high-rate variability, and integration
+with the reporting and CI/CD milestones.
 
 ### Remaining milestones
 

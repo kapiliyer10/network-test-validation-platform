@@ -222,3 +222,20 @@ iperf3_udp_impairment_tests:
     interface: eth1
     loss_percent: 1.0
     min_observed_loss_percent: 0.1
+
+latency_tests:
+  - name: H1_to_H2_icmp_latency
+    client: H1
+    destination: 10.0.24.2
+    interface: eth1
+    packet_count: 5
+    interval_seconds: 0.2
+    timeout_seconds: 10
+    max_avg_rtt_ms: 10.0
+    max_loss_percent: 0.0
+
+latency_impairment_tests:
+  - name: H1_to_H2_icmp_latency_with_20ms_delay
+    base_profile: H1_to_H2_icmp_latency
+    delay_ms: 20
+    min_observed_avg_rtt_ms: 15.0
