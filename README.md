@@ -252,11 +252,23 @@ automates deployment and cleanup, run the test group that matches the
 topology currently running. Do not run the entire suite with `pytest -q`
 when only one topology is deployed.
 
+### Recommended regression command
+
+When the expanded lab is running, use this command to run the expanded-lab
+tests together with tests that are not marked `integration`, including the
+unit-test group:
+
+```bash
+pytest -q -m "expanded_lab or not integration"
+```
+
+This excludes integration tests for other lab environments. Run baseline
+integration tests separately when the baseline `srl-lab` is deployed.
+
 ### Run the baseline suite
 
 The baseline `srl-lab` contains R1, R2, and R3.
 
-    unset NETWORK_TESTBED_CONFIG
     pytest -q -m "not expanded_lab"
 
 Last recorded baseline result before the iperf3 performance test was added:
@@ -265,9 +277,9 @@ Last recorded baseline result before the iperf3 performance test was added:
 19 passed, 2 deselected
 ```
 
-This result predates the addition of the iperf3 performance test. The `expanded_lab` marker now selects three tests: TCP application validation, UDP application validation, and iperf3 performance testing.
-
-Refresh the baseline result with `srl-lab` running before treating it as the current verified result.
+This result predates the later TCP/UDP performance tests and the UDP
+impairment test. Treat it as historical, not as the current verified result.
+Refresh the baseline result with `srl-lab` running before recording a new result.
 
 Run unit tests independently:
 
@@ -286,7 +298,9 @@ These tests cover:
 
 - TCP application-level request/response validation.
 - UDP application-level request/response validation.
-- TCP throughput measurement using iperf3.
+- TCP throughput profiles at 10, 25, and 50 Mbps using iperf3.
+- UDP throughput, packet-loss, and jitter validation using iperf3.
+- Controlled UDP packet-loss detection and cleanup.
 
 #### 1. Prepare the expanded lab
 
@@ -331,19 +345,36 @@ To inspect the selected tests without executing them:
 pytest --collect-only -q -m expanded_lab
 ```
 
-#### 3. Run only the iperf3 performance test
+#### 3. Run an individual performance or impairment test
 
-To run the performance test independently and display its measured throughput and TCP retransmissions:
+Run the TCP performance profiles at 10, 25, and 50 Mbps:
 
 ```bash
 pytest -v -s tests/integration/test_iperf3_performance.py
 ```
 
-The initial automated test uses a configurable 10 Mbps target, a 10-second duration, and a TCP maximum segment size of 1400 bytes. It checks that receiver throughput reaches at least 9 Mbps and retransmissions do not exceed the configured limit of 20.
+Run the UDP performance test, which checks throughput, packet loss, and jitter:
 
-These are initial thresholds for the controlled lab, not production performance requirements.
+```bash
+pytest -v -s tests/integration/test_iperf3_udp_performance.py
+```
 
-One verified run reported 10.06 Mbps at the receiver with two TCP retransmissions. Exploratory higher-rate tests showed some variability, so the maximum sustainable throughput has not yet been established.
+Run the controlled UDP packet-loss detection test:
+
+```bash
+pytest -v -s tests/integration/test_iperf3_udp_impairment.py
+```
+
+The impairment test temporarily applies a 1% `tc netem` packet-loss rule to
+H1's `eth1` egress interface. It passes when measured packet loss exceeds
+0.1% and verifies that the interface returns to its original `noqueue` state.
+
+Run this test only in the controlled expanded lab, not on a production network
+or while unrelated traffic uses that interface. If cleanup fails or the
+interface state is unexpected, stop and investigate before running more tests.
+
+These thresholds are for the controlled lab, not production performance
+requirements.
 
 #### 4. Stop the expanded lab
 
@@ -493,26 +524,47 @@ An earlier exploratory 50 Mbps run exhibited substantial degradation, with 31.8 
 - The initial UDP profile targets 10 Mbps for 10 seconds, with a minimum receiver throughput of 9 Mbps, maximum packet loss of 0.1%, and maximum jitter of 1 ms.
 - Three automated runs passed, each reporting approximately 10 Mbps receiver throughput and zero packet loss. Measured jitter ranged from 0.034 to 0.092 ms across those runs.
 
+#### Controlled UDP impairment and recovery
+
+- Added an automated negative test that applies a temporary 1% packet-loss rule to H1's `eth1` egress interface using `tc netem`.
+- The test passes when measured loss exceeds 0.1%, confirming that the test detects the deliberately introduced packet loss.
+- A verified run measured 1.031% loss, or 89 lost packets out of 8,634.
+- Cleanup removed the temporary rule and verified that H1's interface returned to `qdisc noqueue`.
+- A subsequent normal UDP test passed with 9.998 Mbps receiver throughput, zero packet loss, and 0.066 ms jitter.
+
+The impairment test is intended for the controlled test lab only. Do not run
+it on a production network or while unrelated traffic uses the interface.
+
 #### Integration and regression validation
 
-The expanded-lab test group now contains six tests:
+The expanded-lab test group now contains seven tests:
 
 - TCP application request/response validation.
 - UDP application request/response validation.
 - TCP performance profiles at 10, 25, and 50 Mbps.
 - UDP performance testing at 10 Mbps.
+- Automated UDP packet-loss detection and cleanup.
 
-The expanded-lab suite passed all six tests, with 19 unrelated tests deselected by the `expanded_lab` marker.
-
-The focused regression suite covering unit tests, TCP/UDP application tests, and all TCP/UDP performance profiles passed:
+The expanded-lab suite passed:
 
 ```text
-21 passed in 41.89s
+7 passed, 19 deselected in 51.93s
 ```
 
-These results validate the initial performance profiles under the current containerized lab conditions. They do not establish maximum network capacity or production-network performance limits.
+The focused regression suite, including unit tests, application tests, TCP/UDP
+performance tests, and the new impairment test, passed:
 
-Further work includes additional UDP traffic profiles, controlled packet-loss and jitter testing, investigation of high-rate variability, and integration with the reporting and CI/CD milestones.
+```text
+22 passed in 52.56s
+```
+
+These results validate the configured tests under the current containerized
+lab conditions. They do not establish maximum network capacity or production
+performance limits.
+
+Further work includes additional UDP profiles, controlled delay and jitter
+scenarios, investigation of high-rate variability, and integration with the
+reporting and CI/CD milestones.
 
 ### Remaining milestones
 

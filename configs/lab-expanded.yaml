@@ -214,3 +214,11 @@ iperf3_udp_tests:
     min_receiver_mbps: 9.0
     max_loss_percent: 0.1
     max_jitter_ms: 1.0
+
+# Controlled impairments for negative network validation tests.
+iperf3_udp_impairment_tests:
+  - name: H1_to_H2_udp_10Mbps_with_1pct_loss
+    base_profile: H1_to_H2_udp_10Mbps
+    interface: eth1
+    loss_percent: 1.0
+    min_observed_loss_percent: 0.1
