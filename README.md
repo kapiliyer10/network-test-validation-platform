@@ -118,9 +118,6 @@ Implemented test areas include:
 - Controlled link failure, OSPF failover, and recovery verification.
 - Initial automated TCP throughput testing using iperf3.
 
-Packet capture and deeper traffic troubleshooting with tcpdump and
-Wireshark remain planned extensions.
-
 The native pyATS testbed and custom Docker connection adapter have been
 verified against the baseline SR Linux lab. The adapter reuses the
 existing CLI runner instead of opening a persistent SSH session. Genie
@@ -247,10 +244,9 @@ Readiness alone does not prove that routing or connectivity works.
 
 ## 9. Run pytest
 
-The test suite covers two Containerlab topologies. Until Milestone 9
-automates deployment and cleanup, run the test group that matches the
-topology currently running. Do not run the entire suite with `pytest -q`
-when only one topology is deployed.
+The test suite covers two Containerlab topologies. Run the test group
+that matches the topology currently running. Do not run the entire suite
+with `pytest -q` when only one topology is deployed.
 
 ### Recommended regression command
 
@@ -406,7 +402,7 @@ To return to the baseline lab:
 ./scripts/lab_up.sh
 ```
 
-The baseline and expanded labs are separate execution environments. Pytest markers select tests; they do not deploy, destroy, or switch topologies. Automating the lifecycle and sequential execution of both lab profiles remains part of Milestone 9.
+The baseline and expanded labs are separate execution environments. Pytest markers select tests; they do not deploy, destroy, or switch topologies.
 
 ## 10. Run pyATS AEtest Suites
 
@@ -497,23 +493,37 @@ Status: Complete.
 
 ### Milestone 5 — Negative, Failure, Recovery & Regression Testing
 
-Status: In progress.
+Status: Complete.
 
 - Negative connectivity validation using native pyATS.
 - Expected packet loss verified from SR Linux ping statistics.
 - CLI runner supports explicit handling of expected non-zero exit codes.
 - Unit tests cover optional return-code handling.
-- Controlled R1–R2 interface failure tested using a confirmed commit.
+- Controlled R1–R2 interface failure tested using a confirmed commit with a 300-second rollback timeout.
 - OSPF failover validated by checking the route to R2's loopback through R3.
 - Failover convergence checked against a configurable timeout.
 - Recovery verified through interface-state checks, bounded ping retries, and restoration of the preferred direct OSPF route through R2.
-- Cleanup enters candidate-private mode before issuing `tools system configuration confirmed-reject`.
-- Immediate cancellation of the confirmed-commit timer remains unverified. The cleanup output warned that the rollback timer was still in progress, and recovery was verified before the five-minute timer expired.
-- Additional failure, recovery, and regression scenarios remain planned.
+- The test identifies its own confirmed commit by comparing commit state before and after the change.
+- The rejection command runs in the shared default candidate. The test checks that the identified commit reaches status `failed` before the fallback timer could expire and fails if SR Linux explicitly reports that `confirmed-reject` was ignored.
+- Preflight checks refuse to start if the shared candidate is already dirty or another confirmed commit is active.
+- Cleanup runs `discard now` and verifies that the shared candidate contains no remaining changes.
+
+**Issue encountered and resolution**
+
+The initial cleanup used `enter candidate private`, and the verification expected the rejected commit to reach status `complete`. The router reported the identified rejected commit as `failed`, so the earlier verification incorrectly marked the test as failed. In earlier runs, the test also left `admin-state disable` staged in the shared candidate even after the running interface had recovered.
+
+The test now uses the shared default candidate, identifies the specific confirmed commit, checks its rejection status before the 300-second fallback deadline, detects an explicit ignored-command response, and discards and verifies candidate changes during cleanup. The live test passed with the interface enabled and operationally up, ping connectivity recovered, and the shared candidate clean.
+
+The aggregated CLI output still displayed `Warning: Commit confirmed is still in progress (rollback in 4 minutes)`. Since the runner combines output from candidate entry and the rejection command, that line alone does not identify which command emitted the warning. The passing result is based on the identified commit's early terminal status, the absence of an explicit ignored-command response, and the interface, connectivity, and candidate-cleanup checks.
+
+**Latest validation**
+
+- Focused pyATS failure/recovery run: 2 passed, 0 failed.
+- Baseline regression tests using `pytest -q -m "not expanded_lab"`: 27 passed, 10 deselected in 4.52s.
 
 ### Milestone 6 — Traffic & Performance Testing
 
-Status: In progress.
+Status: Complete.
 
 #### TCP performance validation
 
@@ -591,14 +601,13 @@ The expanded-lab test group now contains ten tests:
 - Baseline ICMP latency validation.
 - Controlled ICMP delay detection and cleanup.
 
-Before the UDP jitter scenario was added, the expanded-lab suite passed:
+The expanded-lab suite passed:
 
 ```text
-9 passed, 19 deselected in 54.96s
+10 passed, 19 deselected in 65.91s
 ```
 
-After consolidating the UDP scenarios and adding jitter detection, the
-recommended regression command passed:
+The recommended regression command passed:
 
 ```text
 25 passed, 4 deselected in 65.72s
@@ -613,18 +622,6 @@ pytest -q -m "expanded_lab or not integration"
 These results validate the configured tests under the current containerized
 lab conditions. They do not establish maximum network capacity or production
 performance limits.
-
-Further work includes additional UDP profiles, more controlled delay and
-jitter scenarios, investigation of high-rate variability, and integration
-with the reporting and CI/CD milestones.
-
-### Remaining milestones
-
-7. Packet Capture & Troubleshooting
-8. Reporting & Quality Metrics
-9. CI/CD & End-to-End Validation
-
-These milestones remain planned until their functionality has been implemented and verified.
 
 ## 12. Development Principles
 

@@ -13,8 +13,20 @@ from pyats.topology import loader
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.commit_state import (
+    find_new_unconfirmed_commit,
+    parse_commit_statuses,
+)
+
 CONFIG_PATH = PROJECT_ROOT / "configs" / "lab.yaml"
 TESTBED_PATH = PROJECT_ROOT / "configs" / "pyats-testbed.yaml"
+
+def _candidate_diff_lines(output: str) -> list[str]:
+    """Extract changed lines from an SR Linux candidate diff."""
+    return [
+        line for line in output.splitlines()
+        if re.match(r"^\s*[+-]\s+\S", line)
+    ]
 
 with CONFIG_PATH.open(encoding="utf-8") as config_file:
     LAB_CONFIG = yaml.safe_load(config_file)
@@ -147,6 +159,9 @@ class FailureRecoveryValidation(aetest.Testcase):
         connection = None
         connected = False
         commit_may_be_pending = False
+        commit_statuses_before = None
+        confirmed_commit_id = None
+        confirmed_commit_started_at = None
 
         failure_problem = None
         recovery_problems = []
@@ -162,6 +177,21 @@ class FailureRecoveryValidation(aetest.Testcase):
             device.connect(via="cli")
             connected = True
             connection = device.connectionmgr.connections["default"]
+
+            # Refuse to run if another operation left staged changes.
+            candidate_check_output = connection.execute_commands(
+                ["enter candidate", "diff", "enter running"],
+                timeout=30,
+            )
+            candidate_changes = _candidate_diff_lines(
+                candidate_check_output
+            )
+            if candidate_changes:
+                raise RuntimeError(
+                    "Shared candidate is not clean; refusing to start "
+                    "failure/recovery test. Staged changes:\n"
+                    + "\n".join(candidate_changes)
+                )
 
             # Establish a healthy baseline before disrupting the link.
             admin_output = device.execute(
@@ -219,12 +249,32 @@ class FailureRecoveryValidation(aetest.Testcase):
                     f"observed route: {baseline_route}"
                 )
 
-            # The timer is the fallback if immediate cleanup fails.
+            # Snapshot state so this test can identify its own commit.
+            commit_state_before = device.execute(
+                "info from state system configuration commit *",
+                timeout=30,
+            )
+            commit_statuses_before = parse_commit_statuses(
+                commit_state_before
+            )
+            active_commits = {
+                commit_id: status
+                for commit_id, status in commit_statuses_before.items()
+                if status in {"unconfirmed", "reverting"}
+            }
+            if active_commits:
+                raise RuntimeError(
+                    "An existing confirmed commit is active; refusing "
+                    f"to start another failure test: {active_commits}"
+                )
+
+            # Keep the timer as a fallback if immediate cleanup fails.
             commit_may_be_pending = True
+            confirmed_commit_started_at = time.monotonic()
 
             change_output = connection.execute_commands(
                 [
-                    "enter candidate private",
+                    "enter candidate",
                     f"interface {interface} admin-state disable",
                     f"commit confirmed timeout {rollback_timeout}",
                 ],
@@ -236,6 +286,22 @@ class FailureRecoveryValidation(aetest.Testcase):
                     "SR Linux did not acknowledge the confirmed commit.\n"
                     f"Output:\n{change_output}"
                 )
+
+            commit_state_after = device.execute(
+                "info from state system configuration commit *",
+                timeout=30,
+            )
+            commit_statuses_after = parse_commit_statuses(
+                commit_state_after
+            )
+            confirmed_commit_id = find_new_unconfirmed_commit(
+                commit_statuses_before,
+                commit_statuses_after,
+            )
+            print(
+                f"{test_name}: identified confirmed commit "
+                f"{confirmed_commit_id}."
+            )
 
             # A ping with expected packet loss may have exit code 1.
             failure_output = device.execute(
@@ -337,20 +403,180 @@ class FailureRecoveryValidation(aetest.Testcase):
             if connected:
                 # Attempt immediate rollback before checking recovery.
                 if commit_may_be_pending:
+                    rollback_output = ""
+                    rollback_command_problem = None
+                    elapsed_before_reject = (
+                        time.monotonic() - confirmed_commit_started_at
+                        if confirmed_commit_started_at is not None
+                        else None
+                    )
+                    reject_before_fallback_timeout = (
+                        elapsed_before_reject is not None
+                        and elapsed_before_reject < float(rollback_timeout)
+                    )
+
                     try:
                         rollback_output = connection.execute_commands(
                             [
-                                "enter candidate private",
+                                "enter candidate",
                                 "tools system configuration confirmed-reject",
                             ],
                             timeout=30,
                         )
                         print(
-                            f"{test_name}: rollback command output:\n"
+                            f"{test_name}: confirmed-reject output:\n"
                             f"{rollback_output}"
                         )
+
+                        if (
+                            "Error: Commit confirmed reject command ignored"
+                            in rollback_output
+                        ):
+                            rollback_command_problem = (
+                                "SR Linux reported that confirmed-reject was "
+                                "ignored because no confirmed commit was active. "
+                                f"Output: {rollback_output}"
+                            )
                     except Exception as exc:
+                        rollback_command_problem = (
+                            f"{type(exc).__name__}: {exc}"
+                        )
+                        print(
+                            f"{test_name}: confirmed-reject raised an error: "
+                            f"{rollback_command_problem}"
+                        )
+
+                    # A missing commit ID means cancellation cannot be
+                    # attributed to this test's specific confirmed commit.
+                    if (
+                        confirmed_commit_id is None
+                        or commit_statuses_before is None
+                    ):
                         rollback_problem = (
+                            "Could not identify this test's confirmed-commit "
+                            "ID; immediate timer cancellation cannot be "
+                            "verified safely. Inspect R1's commit state."
+                        )
+                    else:
+                        cancel_verified = False
+                        last_commit_status = None
+                        last_state_output = ""
+                        last_state_error = None
+                        verify_deadline = time.monotonic() + 30
+
+                        # confirmed-reject may initiate a revert. Poll until
+                        # the commit is terminal or the bounded wait expires.
+                        while time.monotonic() < verify_deadline:
+                            try:
+                                state_output = device.execute(
+                                    "info from state system configuration commit *",
+                                    timeout=15,
+                                )
+                                last_state_output = state_output
+                                current_statuses = parse_commit_statuses(
+                                    state_output
+                                )
+                                last_commit_status = current_statuses.get(
+                                    confirmed_commit_id
+                                )
+                                last_state_error = None
+
+                                if last_commit_status == "failed":
+                                    if reject_before_fallback_timeout:
+                                        cancel_verified = True
+                                        print(
+                                            f"{test_name}: confirmed commit "
+                                            f"{confirmed_commit_id} reached "
+                                            "status failed before the "
+                                            "configured rollback timer could expire."
+                                        )
+                                    else:
+                                        last_state_error = (
+                                            "Commit reached status failed, but "
+                                            "the rejection attempt was not "
+                                            "verified before the fallback timer deadline."
+                                        )
+                                    break
+
+                                if last_commit_status == "complete":
+                                    last_state_error = (
+                                        f"Commit {confirmed_commit_id} reached "
+                                        "status complete rather than being "
+                                        "rejected; cancellation is not verified."
+                                    )
+                                    break
+
+                                last_state_error = (
+                                    f"Commit {confirmed_commit_id} status is "
+                                    f"{last_commit_status!r}; waiting for "
+                                    "the expected rejection status 'failed'."
+                                )
+
+                            except Exception as exc:
+                                last_state_error = (
+                                    f"{type(exc).__name__}: {exc}"
+                                )
+
+                            time.sleep(1)
+
+                        if not cancel_verified:
+                            rollback_problem = (
+                                f"Confirmed commit {confirmed_commit_id} "
+                                "did not reach a verified rejection status "
+                                "'failed' within 30 seconds after "
+                                "confirmed-reject.\n"
+                                f"Last status: {last_commit_status!r}\n"
+                                f"Elapsed before reject: "
+                                f"{elapsed_before_reject!r} seconds\n"
+                                f"Configured fallback timeout: "
+                                f"{rollback_timeout} seconds\n"
+                                f"Last state-query error: {last_state_error}\n"
+                                f"Last commit state:\n{last_state_output}\n"
+                                f"confirmed-reject output:\n{rollback_output}"
+                            )
+                        elif rollback_command_problem is not None:
+                            # The commit state is terminal, but an exception
+                            # means immediate cancellation itself is unproven.
+                            rollback_problem = (
+                                "Commit reached a terminal status, but the "
+                                "confirmed-reject call raised an exception; "
+                                "immediate cancellation cannot be proven. "
+                                f"Command error: {rollback_command_problem}"
+                            )
+
+                # Clear only this test’s staged change. The preflight check
+                # ensured the shared candidate had no earlier user changes.
+                if commit_may_be_pending:
+                    try:
+                        discard_output = connection.execute_commands(
+                            ["enter candidate", "discard now"], timeout=30
+                        )
+                        print(
+                            f"{test_name}: candidate cleanup output:\n"
+                            f"{discard_output}"
+                        )
+                    except Exception as exc:
+                        recovery_problems.append(
+                            "Could not discard the test candidate changes: "
+                            f"{type(exc).__name__}: {exc}"
+                        )
+
+                    try:
+                        candidate_final_output = connection.execute_commands(
+                            ["enter candidate", "diff", "enter running"],
+                            timeout=30,
+                        )
+                        remaining_changes = _candidate_diff_lines(
+                            candidate_final_output
+                        )
+                        if remaining_changes:
+                            recovery_problems.append(
+                                "Shared candidate is still dirty after cleanup:\n"
+                                + "\n".join(remaining_changes)
+                            )
+                    except Exception as exc:
+                        recovery_problems.append(
+                            "Could not verify the shared candidate is clean: "
                             f"{type(exc).__name__}: {exc}"
                         )
 
@@ -509,18 +735,20 @@ class FailureRecoveryValidation(aetest.Testcase):
             )
             return
 
+        if rollback_problem:
+            self.failed(
+                f"{test_name}: confirmed-commit cancellation "
+                "could not be verified.\n"
+                f"{rollback_problem}"
+            )
+            return
+
         message = (
             f"{test_name}: expected link failure observed, "
-            "interface enabled and up, and ping connectivity recovered."
+            "confirmed-commit cancellation verified before the fallback "
+            "timeout, interface enabled and up, ping connectivity recovered, "
+            "and shared candidate clean."
         )
-
-        if rollback_problem:
-            message += (
-                " The rollback command returned an error, but the final "
-                "interface and connectivity checks passed. Review the "
-                f"rollback response: {rollback_problem}"
-            )
-
         self.passed(message)
 
 
