@@ -726,9 +726,13 @@ after controlled impairments. Python compilation and `git diff --check`
 also passed.
 
 The original-lab test group contains four tests: router discovery and three
-TCP-probe cases. Their marker-based selection was verified, but those tests
-must be run with the baseline `srl-lab` deployed before recording a new
-baseline verification result.
+TCP-probe cases. With the baseline `srl-lab` deployed, all four tests passed:
+
+    4 passed, 33 deselected in 4.29s
+
+The original-lab tests and expanded-lab tests were run separately against
+their intended topologies. Across the unit, expanded-lab, and original-lab
+runs, all 37 collected tests passed, with no failures.
 
 #### Known limitation
 
