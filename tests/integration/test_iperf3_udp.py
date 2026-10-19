@@ -4,7 +4,7 @@ import json
 from contextlib import contextmanager
 from pathlib import Path
 import subprocess
-
+from src.packet_capture import PacketCapture
 import pytest
 import yaml
 
@@ -26,10 +26,26 @@ def docker_exec(container, *args, timeout=10):
     )
 
 
-def run_iperf3_udp(profile, rate_mbps=None):
-    """Run iperf3 and return receiver throughput, loss, and jitter."""
+def run_iperf3_udp(profile, rate_mbps=None, capture_name=None):
+    """Run iperf3 with packet capture and return UDP performance metrics."""
     lab = LAB_CONFIG["lab"]
     client_container = f'{lab["container_prefix"]}{profile["client"]}'
+
+    capture_name = capture_name or profile["name"]
+    output_path = (
+        PROJECT_ROOT / "artifacts" / "pcap" / f"{capture_name}.pcap"
+    )
+
+    capture = PacketCapture(
+        container=client_container,
+        interface="eth1",
+        capture_filter=(
+            f'host {profile["destination"]} '
+            f'and udp port {profile["port"]}'
+        ),
+        output_path=output_path,
+    )
+
     rate = (
         profile["target_bitrate_mbps"]
         if rate_mbps is None
@@ -48,19 +64,33 @@ def run_iperf3_udp(profile, rate_mbps=None):
         "-J",
     ]
 
+    capture.start()
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=profile["duration_seconds"] + 30,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        pytest.fail(f'{profile["name"]}: iperf3 timed out: {exc}')
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=profile["duration_seconds"] + 30,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            pytest.fail(f"{capture_name}: iperf3 timed out: {exc}")
+    finally:
+        capture.stop()
+
+    assert capture.packet_count > 0, (
+        f"{capture_name}: no packets matched the capture filter. "
+        f"PCAP: {output_path}"
+    )
+
+    print(
+        f"{capture_name}: captured {capture.packet_count} packets; "
+        f"PCAP saved to {output_path}"
+    )
 
     assert result.returncode == 0, (
-        f'{profile["name"]}: iperf3 failed.\n'
+        f"{capture_name}: iperf3 failed.\n"
         f"stdout:\n{result.stdout}\n"
         f"stderr:\n{result.stderr}"
     )
@@ -79,7 +109,7 @@ def run_iperf3_udp(profile, rate_mbps=None):
         }
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
         pytest.fail(
-            f'{profile["name"]}: invalid iperf3 UDP JSON: {exc}\n'
+            f"{capture_name}: invalid iperf3 UDP JSON: {exc}\n"
             f"stdout:\n{result.stdout}\n"
             f"stderr:\n{result.stderr}"
         )
@@ -239,7 +269,10 @@ def test_iperf3_udp_detects_packet_loss(test_case):
         ["loss", loss_arg],
         f"loss {loss_arg}",
     ):
-        result = run_iperf3_udp(profile)
+        result = run_iperf3_udp(
+            profile,
+            capture_name=test_case["name"],
+        )
         print_udp_result(test_case["name"], result)
 
         assert result["total_packets"] > 0, (
@@ -286,7 +319,9 @@ def test_iperf3_udp_detects_jitter(test_case):
         expected_state,
     ):
         result = run_iperf3_udp(
-            profile, rate_mbps=test_case["target_bitrate_mbps"]
+            profile,
+            rate_mbps=test_case["target_bitrate_mbps"],
+            capture_name=test_case["name"],
         )
         print_udp_result(test_case["name"], result)
 

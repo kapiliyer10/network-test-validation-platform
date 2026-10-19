@@ -1,4 +1,4 @@
-"""Application-level TCP connectivity tests."""
+"""Application-level TCP connectivity tests with packet-capture artifacts."""
 
 from pathlib import Path
 import subprocess
@@ -6,12 +6,11 @@ import subprocess
 import pytest
 import yaml
 
+from src.packet_capture import PacketCapture
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-CONFIG_PATH = (
-    PROJECT_ROOT / "configs" / "lab-expanded.yaml"
-)
+CONFIG_PATH = PROJECT_ROOT / "configs" / "lab-expanded.yaml"
 
 with CONFIG_PATH.open(encoding="utf-8") as config_file:
     LAB_CONFIG = yaml.safe_load(config_file)
@@ -44,6 +43,7 @@ if response != expected:
 print(f"TCP application response verified: {response.decode()}")
 """
 
+
 @pytest.mark.expanded_lab
 @pytest.mark.integration
 @pytest.mark.parametrize(
@@ -53,8 +53,22 @@ print(f"TCP application response verified: {response.decode()}")
 )
 def test_tcp_application_exchange(test_case):
     lab = LAB_CONFIG["lab"]
-    client_container = (
-        f'{lab["container_prefix"]}{test_case["client"]}'
+    client_container = f'{lab["container_prefix"]}{test_case["client"]}'
+    output_path = (
+        PROJECT_ROOT
+        / "artifacts"
+        / "pcap"
+        / f'{test_case["name"]}.pcap'
+    )
+
+    capture = PacketCapture(
+        container=client_container,
+        interface="eth1",
+        capture_filter=(
+            f'host {test_case["destination"]} '
+            f'and tcp port {test_case["port"]}'
+        ),
+        output_path=output_path,
     )
 
     command = [
@@ -70,27 +84,41 @@ def test_tcp_application_exchange(test_case):
         test_case["expected_response"],
     ]
 
+    capture.start()
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        pytest.fail(
-            f'{test_case["name"]}: TCP application test timed out. '
-            f"Client: {client_container}, "
-            f"destination: {test_case['destination']}:"
-            f"{test_case['port']}. Error: {exc}"
-        )
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            pytest.fail(
+                f'{test_case["name"]}: TCP application test timed out. '
+                f"Client: {client_container}, "
+                f"destination: {test_case['destination']}:"
+                f"{test_case['port']}. Error: {exc}"
+            )
 
-    assert result.returncode == 0, (
-        f'{test_case["name"]}: TCP application exchange failed.\n'
-        f"Client: {client_container}\n"
-        f"Destination: {test_case['destination']}:"
-        f"{test_case['port']}\n"
-        f"stdout:\n{result.stdout}\n"
-        f"stderr:\n{result.stderr}"
+        assert result.returncode == 0, (
+            f'{test_case["name"]}: TCP application exchange failed.\n'
+            f"Client: {client_container}\n"
+            f"Destination: {test_case['destination']}:"
+            f"{test_case['port']}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+    finally:
+        capture.stop()
+
+    assert capture.packet_count > 0, (
+        f'{test_case["name"]}: no packets matched the capture filter. '
+        f"PCAP: {output_path}"
+    )
+
+    print(
+        f'{test_case["name"]}: captured {capture.packet_count} packets; '
+        f"PCAP saved to {output_path}"
     )

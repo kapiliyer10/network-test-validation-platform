@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 import subprocess
-
+from src.packet_capture import PacketCapture
 import pytest
 import yaml
 
@@ -37,11 +37,21 @@ def docker_exec(container, *args, timeout=10):
     )
 
 
-def measure_latency(test_case):
+def measure_latency(test_case, capture_name=None):
     """Run BusyBox ping and parse packet-loss and RTT statistics."""
     lab = LAB_CONFIG["lab"]
     client_container = f'{lab["container_prefix"]}{test_case["client"]}'
+    capture_name = capture_name or test_case["name"]
+    output_path = (
+        PROJECT_ROOT / "artifacts" / "pcap" / f"{capture_name}.pcap"
+    )
 
+    capture = PacketCapture(
+        container=client_container,
+        interface=test_case.get("interface", "eth1"),
+        capture_filter=f'host {test_case["destination"]} and icmp',
+        output_path=output_path,
+    )
     command = [
         "docker", "exec", client_container,
         "ping",
@@ -52,16 +62,30 @@ def measure_latency(test_case):
         test_case["destination"],
     ]
 
+    capture.start()
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=test_case["timeout_seconds"] + 5,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        pytest.fail(f'{test_case["name"]}: ping timed out: {exc}')
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=test_case["timeout_seconds"] + 5,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            pytest.fail(f'{capture_name}: ping timed out: {exc}')
+    finally:
+        capture.stop()
+
+    assert capture.packet_count > 0, (
+        f"{capture_name}: no ICMP packets matched the capture filter. "
+        f"PCAP: {output_path}"
+    )
+
+    print(
+        f"{capture_name}: captured {capture.packet_count} packets; "
+        f"PCAP saved to {output_path}"
+    )
 
     output = result.stdout + "\n" + result.stderr
     stats_match = PING_STATS_PATTERN.search(output)
@@ -171,7 +195,10 @@ def test_icmp_latency_detects_added_delay(test_case):
             f"stderr:\n{apply_result.stderr}"
         )
 
-        result = measure_latency(base_profile)
+        result = measure_latency(
+            base_profile,
+            capture_name=test_case["name"],
+        )
 
         print(
             f'{test_case["name"]}: '

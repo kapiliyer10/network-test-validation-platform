@@ -10,7 +10,7 @@ from src.cli_runner import (
     run_router_cli_command,
     run_router_cli_commands,
 )
-
+pytestmark = pytest.mark.unit
 
 @pytest.mark.unit
 def test_successful_command_returns_output(monkeypatch):

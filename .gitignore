@@ -1,3 +1,6 @@
 .venv/
 __pycache__/
 .pytest_cache/
+
+# Generated packet-capture artifacts
+/artifacts/pcap/

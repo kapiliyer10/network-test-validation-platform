@@ -3,7 +3,7 @@
 import pytest
 
 from src.testbed import Testbed
-
+pytestmark = pytest.mark.unit
 
 @pytest.fixture
 def configuration():

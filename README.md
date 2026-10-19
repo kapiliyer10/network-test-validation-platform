@@ -77,10 +77,17 @@ failure and recovery scenarios.
                 v
     JSON measurements and assertions
 
-The expanded lab provides dedicated Linux traffic endpoints. The
-performance test generates TCP traffic with iperf3, collects structured
-JSON results, and checks receiver throughput and retransmissions against
-configurable thresholds.
+The expanded lab provides dedicated Linux traffic endpoints. TCP and UDP
+application tests verify request/response behavior, while iperf3 tests collect
+structured JSON measurements for throughput, TCP retransmissions, UDP packet
+loss, and jitter. ICMP tests measure round-trip latency and packet loss,
+including a controlled-delay scenario.
+
+A reusable `src/packet_capture.py` helper runs filtered `tcpdump` captures on
+H1's `eth1` interface during each expanded-lab scenario. It waits for capture
+readiness, copies the resulting PCAP into `artifacts/pcap/`, and verifies that
+packets can be decoded. These files provide packet-level evidence alongside
+test results and performance metrics.
 
 Keeping traffic generation on Linux endpoints allows the tests to measure
 the routed data path without requiring traffic-generation applications
@@ -104,7 +111,9 @@ inside the Nokia routers.
 - **Containerlab** — defines and deploys the network topologies.
 - **Nokia SR Linux CLI** — interface, routing, protocol, and connectivity
   observations.
-- **iperf3** — TCP traffic generation and throughput measurement.
+- **iperf3** — TCP/UDP traffic generation and performance measurement.
+- **tcpdump/libpcap** — filtered packet capture on Linux endpoints.
+- **PCAP artifacts** — packet-level evidence for troubleshooting test traffic.
 
 ### Validation coverage
 
@@ -116,7 +125,10 @@ Implemented test areas include:
 - OSPF neighbor and route validation.
 - LLDP adjacency validation.
 - Controlled link failure, OSPF failover, and recovery verification.
-- Initial automated TCP throughput testing using iperf3.
+- TCP throughput profiles at 10, 25, and 50 Mbps with retransmission checks.
+- UDP throughput, packet-loss, and jitter validation, including controlled impairments.
+- ICMP round-trip latency and packet-loss checks, including controlled delay.
+- Automated filtered packet capture for expanded-lab test scenarios.
 
 The native pyATS testbed and custom Docker connection adapter have been
 verified against the baseline SR Linux lab. The adapter reuses the
@@ -164,9 +176,9 @@ H1 connects to R1 using `10.0.14.2/30`, and H2 connects to R2 using
 `10.0.24.2/30`. The routers' interconnections provide the routed path
 between the endpoints.
 
-The expanded profile supports TCP and UDP application tests and the
-initial iperf3 performance test. Its container names use the
-`clab-srl-expanded-` prefix.
+The expanded profile supports TCP/UDP application tests, iperf3 throughput,
+packet-loss and jitter validation, ICMP latency testing, and automated packet
+capture. Its container names use the `clab-srl-expanded-` prefix.
 
 The baseline and expanded profiles are run separately when local resource
 constraints prevent both labs from running simultaneously. Tests must
@@ -251,21 +263,26 @@ with `pytest -q` when only one topology is deployed.
 ### Recommended regression command
 
 When the expanded lab is running, use this command to run the expanded-lab
-tests together with tests that are not marked `integration`, including the
-unit-test group:
+tests and the isolated unit-test group:
 
 ```bash
-pytest -q -m "expanded_lab or not integration"
+pytest -q -m "expanded_lab or unit"
 ```
 
-This excludes integration tests for other lab environments. Run baseline
-integration tests separately when the baseline `srl-lab` is deployed.
+The markers have distinct purposes:
+
+- `unit` selects isolated tests that do not require a live lab.
+- `original_lab` selects tests for the baseline `srl-lab` topology.
+- `expanded_lab` selects tests for `srl-expanded`.
+
+Markers select tests; they do not deploy, stop, or switch topologies.
+Run only the test group that matches the environment currently deployed.
 
 ### Run the baseline suite
 
 The baseline `srl-lab` contains R1, R2, and R3.
 
-    pytest -q -m "not expanded_lab"
+    pytest -q -m "unit or original_lab"
 
 Last recorded baseline result before the iperf3 performance test was added:
 
@@ -284,7 +301,7 @@ Run unit tests independently:
 Run baseline integration tests independently:
 
     unset NETWORK_TESTBED_CONFIG
-    pytest -q -m "integration and not expanded_lab"
+    pytest -q -m "integration and original_lab"
 
 ### Run the Expanded-Lab Application, Performance, and Latency Tests
 
@@ -299,6 +316,7 @@ These tests cover:
 - Controlled UDP packet-loss detection and cleanup.
 - ICMP round-trip latency and packet-loss validation.
 - Controlled 20 ms delay detection and cleanup.
+- Automated filtered packet capture producing a separate PCAP artifact per test.
 
 #### 1. Prepare the expanded lab
 
@@ -311,7 +329,8 @@ cd ~/network-automation-platform
 ./scripts/lab_down.sh
 ```
 
-Build the endpoint image. This image includes the networking utilities, TCP/UDP application servers, and iperf3.
+Build the endpoint image. It includes the networking utilities, TCP/UDP
+application servers, iperf3, and `tcpdump` for packet capture.
 
 ```bash
 docker build -t network-test-endpoint:1.0 topology/tcp-endpoint
@@ -335,7 +354,8 @@ source .venv/bin/activate
 pytest -q -m expanded_lab
 ```
 
-This selects the TCP application, UDP application, and iperf3 performance tests.
+This selects the ten expanded-lab tests covering TCP/UDP applications, iperf3
+performance, latency, packet-capture generation, and controlled impairments.
 
 To inspect the selected tests without executing them:
 
@@ -386,6 +406,26 @@ more tests.
 
 These thresholds are for the controlled lab, not production performance
 requirements.
+
+#### Packet-capture artifacts
+
+Each expanded-lab test saves a PCAP file named after its test case under
+`artifacts/pcap/`. The directory is excluded from version control because
+these files are generated test artifacts.
+
+The reusable `PacketCapture` helper starts `tcpdump` inside the H1 container,
+confirms that capture is ready, stops it after traffic generation, copies the
+PCAP to the host, and verifies that packets can be decoded. The capture filter
+matches the scenario's destination and TCP/UDP port or ICMP traffic.
+
+If capture shutdown or PCAP validation fails, remote capture files are
+preserved for diagnosis. The helper removes remote temporary files after a
+successful validation.
+
+**Known limitation:** The current helper stops capture using
+`killall -INT tcpdump`, which affects all `tcpdump` processes in H1. Keep
+these tests sequential; do not run captures in parallel until shutdown is
+limited to the individual test's process.
 
 #### 4. Stop the expanded lab
 
@@ -593,7 +633,8 @@ uses the affected interface.
 
 #### Integration and regression validation
 
-The expanded-lab test group now contains ten tests:
+At Milestone 6 completion, before packet-capture integration, the
+expanded-lab test group contained ten tests:
 
 - TCP and UDP application request/response validation.
 - TCP performance profiles at 10, 25, and 50 Mbps.
@@ -601,19 +642,20 @@ The expanded-lab test group now contains ten tests:
 - Baseline ICMP latency validation.
 - Controlled ICMP delay detection and cleanup.
 
-The expanded-lab suite passed:
+Before Milestone 7 packet-capture integration, the expanded-lab suite passed:
 
 ```text
 10 passed, 19 deselected in 65.91s
 ```
 
-The recommended regression command passed:
+Before Milestone 7 packet-capture integration, the recommended regression
+command passed:
 
 ```text
 25 passed, 4 deselected in 65.72s
 ```
 
-The regression command is:
+The command used for that historical regression result was:
 
 ```bash
 pytest -q -m "expanded_lab or not integration"
@@ -622,6 +664,78 @@ pytest -q -m "expanded_lab or not integration"
 These results validate the configured tests under the current containerized
 lab conditions. They do not establish maximum network capacity or production
 performance limits.
+
+### Milestone 7 — Packet Capture & Troubleshooting
+
+**Status:** Packet-capture implementation and expanded-lab validation complete.
+The original-lab tests have not yet been rerun against `srl-lab` after adding
+the explicit topology markers.
+
+#### Reusable packet-capture utility
+
+- Added `src/packet_capture.py` with the `PacketCapture` lifecycle and
+  `PacketCaptureError` exception.
+- The helper starts filtered `tcpdump` in a Docker endpoint, waits for
+  readiness, stops the capture after traffic generation, copies the PCAP to
+  the project, and verifies that decoded packets are present.
+- Unique remote filenames prevent temporary capture files from different
+  test cases from colliding.
+- Remote files are removed after successful validation and retained for
+  diagnosis when capture shutdown or PCAP validation fails.
+- The endpoint image includes `tcpdump` alongside the existing networking
+  utilities and traffic-generation tools.
+- Added `/artifacts/pcap/` to `.gitignore` so generated captures are not
+  committed.
+
+#### Test integration
+
+Automated packet capture is integrated into all ten expanded-lab tests:
+
+- TCP and UDP application request/response tests.
+- TCP iperf3 profiles at 10, 25, and 50 Mbps.
+- UDP iperf3 normal-performance, packet-loss, and jitter scenarios.
+- Normal ICMP latency and controlled 20 ms delay scenarios.
+
+Each scenario saves a separate PCAP file and fails if its capture contains
+no decoded packets.
+
+#### Verification
+
+Latest unit-test result:
+
+```text
+23 passed, 14 deselected in 0.21s
+```
+
+Latest expanded-lab test result:
+
+```text
+10 passed, 27 deselected in 96.81s
+```
+
+Latest combined regression result using the README-recommended command
+`pytest -q -m "expanded_lab or unit"`:
+
+```text
+33 passed, 4 deselected in 106.78s
+```
+
+The expanded-lab run verified TCP/UDP exchanges, throughput, packet-loss and
+jitter detection, ICMP latency, PCAP generation, and restoration of `noqueue`
+after controlled impairments. Python compilation and `git diff --check`
+also passed.
+
+The original-lab test group contains four tests: router discovery and three
+TCP-probe cases. Their marker-based selection was verified, but those tests
+must be run with the baseline `srl-lab` deployed before recording a new
+baseline verification result.
+
+#### Known limitation
+
+The capture helper currently uses `killall -INT tcpdump` within H1. This
+works for the verified sequential test runs but is not isolated to a single
+capture process. Parallel capture execution is not supported until
+process-specific shutdown is implemented.
 
 ## 12. Development Principles
 

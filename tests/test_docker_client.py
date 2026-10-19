@@ -1,9 +1,10 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-pytestmark = pytest.mark.unit
 
 from src.docker_client import get_container
+
+pytestmark = pytest.mark.unit
 
 
 @patch("src.docker_client.docker.from_env")

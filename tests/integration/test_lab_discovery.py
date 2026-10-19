@@ -1,7 +1,10 @@
 from src.lab_discovery import discover_lab_routers
 import pytest
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.original_lab,
+]
 
 def test_project1_routers_are_discovered_and_running():
     routers = discover_lab_routers()

@@ -7,6 +7,8 @@ import subprocess
 import pytest
 import yaml
 
+from src.packet_capture import PacketCapture
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = PROJECT_ROOT / "configs" / "lab-expanded.yaml"
@@ -28,6 +30,22 @@ def test_iperf3_tcp_throughput(test_case):
 
     client_container = f'{prefix}{test_case["client"]}'
     server_container = f'{prefix}{test_case["server"]}'
+    output_path = (
+        PROJECT_ROOT
+        / "artifacts"
+        / "pcap"
+        / f'{test_case["name"]}.pcap'
+    )
+
+    capture = PacketCapture(
+        container=client_container,
+        interface="eth1",
+        capture_filter=(
+            f'host {test_case["destination"]} '
+            f'and tcp port {test_case["port"]}'
+        ),
+        output_path=output_path,
+    )
 
     command = [
         "docker", "exec", client_container,
@@ -41,20 +59,34 @@ def test_iperf3_tcp_throughput(test_case):
         "-J",
     ]
 
+    capture.start()
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=test_case["duration_seconds"] + 30,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        pytest.fail(
-            f'{test_case["name"]}: iperf3 timed out. '
-            f"Client: {client_container}; server: {server_container}; "
-            f"error: {exc}"
-        )
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=test_case["duration_seconds"] + 30,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            pytest.fail(
+                f'{test_case["name"]}: iperf3 timed out. '
+                f"Client: {client_container}; server: {server_container}; "
+                f"error: {exc}"
+            )
+    finally:
+        capture.stop()
+
+    assert capture.packet_count > 0, (
+        f'{test_case["name"]}: no packets matched the capture filter. '
+        f"PCAP: {output_path}"
+    )
+
+    print(
+        f'{test_case["name"]}: captured {capture.packet_count} packets; '
+        f"PCAP saved to {output_path}"
+    )
 
     assert result.returncode == 0, (
         f'{test_case["name"]}: iperf3 failed.\n'

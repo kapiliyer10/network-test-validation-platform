@@ -3,7 +3,7 @@
 import pytest
 
 from src.commit_state import parse_commit_statuses
-
+pytestmark = pytest.mark.unit
 
 @pytest.mark.unit
 def test_parse_multiple_commit_statuses():

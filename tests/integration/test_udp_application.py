@@ -6,6 +6,8 @@ import subprocess
 import pytest
 import yaml
 
+from src.packet_capture import PacketCapture
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -49,6 +51,22 @@ def test_udp_application_exchange(test_case):
     client_container = (
         f'{lab["container_prefix"]}{test_case["client"]}'
     )
+    output_path = (
+        PROJECT_ROOT
+        / "artifacts"
+        / "pcap"
+        / f'{test_case["name"]}.pcap'
+    )
+
+    capture = PacketCapture(
+        container=client_container,
+        interface="eth1",
+        capture_filter=(
+            f'host {test_case["destination"]} '
+            f'and udp port {test_case["port"]}'
+        ),
+        output_path=output_path,
+    )
 
     command = [
         "docker",
@@ -63,27 +81,41 @@ def test_udp_application_exchange(test_case):
         test_case["expected_response"],
     ]
 
+    capture.start()
     try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        pytest.fail(
-            f'{test_case["name"]}: UDP application test timed out. '
-            f"Client: {client_container}, "
-            f"destination: {test_case['destination']}:"
-            f"{test_case['port']}. Error: {exc}"
-        )
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            pytest.fail(
+                f'{test_case["name"]}: UDP application test timed out. '
+                f"Client: {client_container}, "
+                f"destination: {test_case['destination']}:"
+                f"{test_case['port']}. Error: {exc}"
+            )
 
-    assert result.returncode == 0, (
-        f'{test_case["name"]}: UDP application exchange failed.\n'
-        f"Client: {client_container}\n"
-        f"Destination: {test_case['destination']}:"
-        f"{test_case['port']}\n"
-        f"stdout:\n{result.stdout}\n"
-        f"stderr:\n{result.stderr}"
+        assert result.returncode == 0, (
+            f'{test_case["name"]}: UDP application exchange failed.\\n'
+            f"Client: {client_container}\\n"
+            f"Destination: {test_case['destination']}:"
+            f"{test_case['port']}\\n"
+            f"stdout:\n{result.stdout}\\n"
+            f"stderr:\n{result.stderr}"
+        )
+    finally:
+        capture.stop()
+
+    assert capture.packet_count > 0, (
+        f'{test_case["name"]}: no packets matched the capture filter. '
+        f"PCAP: {output_path}"
+    )
+
+    print(
+        f'{test_case["name"]}: captured {capture.packet_count} packets; '
+        f"PCAP saved to {output_path}"
     )
