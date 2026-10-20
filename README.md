@@ -667,9 +667,7 @@ performance limits.
 
 ### Milestone 7 — Packet Capture & Troubleshooting
 
-**Status:** Packet-capture implementation and expanded-lab validation complete.
-The original-lab tests have not yet been rerun against `srl-lab` after adding
-the explicit topology markers.
+**Status:** Complete. Packet-capture implementation, both topology-specific regressions, Wireshark analysis, and controlled-failure investigation are verified.
 
 #### Reusable packet-capture utility
 
@@ -733,6 +731,51 @@ TCP-probe cases. With the baseline `srl-lab` deployed, all four tests passed:
 The original-lab tests and expanded-lab tests were run separately against
 their intended topologies. Across the unit, expanded-lab, and original-lab
 runs, all 37 collected tests passed, with no failures.
+
+#### Wireshark analysis and controlled-failure investigation
+
+The following representative captures were opened and inspected in Wireshark.
+
+- **TCP echo** (`H1_to_H2_tcp_echo.pcap`): the capture showed the TCP handshake,
+  application data in both directions, and FIN/ACK closure. Follow TCP Stream
+  displayed the request `NETWORK_VALIDATION` and response
+  `TCP_OK:NETWORK_VALIDATION`.
+- **UDP echo** (`H1_to_H2_udp_echo.pcap`): two UDP datagrams showed the request
+  `NETWORK_VALIDATION` and response `UDP_OK:NETWORK_VALIDATION`. This confirms
+  the captured exchange, not guaranteed delivery of other UDP datagrams.
+- **Baseline ICMP** (`H1_to_H2_icmp_latency.pcap`): five Echo Requests and
+  five matching Echo Replies were visible, with no missing reply among those
+  five exchanges.
+- **Normal UDP performance** (`H1_to_H2_udp_10Mbps.pcap`): the inspected
+  sequence numbers were consecutive, and a Wireshark packet-details search
+  for `UDP packet loss or out of order delivery` found no match.
+- **Controlled UDP loss** (`H1_to_H2_udp_10Mbps_with_1pct_loss.pcap`):
+  Wireshark flagged an iPerf3 sequence gap, showing sequence 14 after
+  sequence 12. The recorded receiver report measured 89 lost packets out of
+  8,634 (1.031%). This exceeded the configured 0.1% detection threshold for
+  the 1% impairment test. The test verified cleanup back to `qdisc noqueue`.
+
+**Evidence limitations:** The UDP-loss PCAP was captured on H1's sending
+interface. Its sequence-gap warning is supporting evidence, but that capture
+alone cannot establish where packets were lost or the end-to-end loss count.
+The receiver-side iperf3 statistics provide the measured loss result.
+
+For the controlled 20 ms ICMP delay, Wireshark displayed a response time of
+0.910 ms for the first request/reply pair in the inspected capture. This did
+not match the RTT measured by ping. A direct ping under the impairment measured
+21.113 ms average RTT.
+
+Seven focused pytest runs reported average RTTs of 63.503, 20.957, 50.534,
+21.191, 21.193, 21.393, and 21.116 ms. Five readings were close to 21 ms,
+while two were elevated. The elevated results were not consistently reproduced,
+and their cause remains undetermined. Transient warm-up or ARP/neighbour-cache
+resolution is a possible explanation, but it was not isolated or confirmed.
+
+For this scenario, use ping statistics to validate RTT. The inspected H1-side
+PCAP confirmed the captured ICMP exchanges, but its Wireshark response-time
+value did not agree with ping and is not treated as a reliable latency result.
+The temporary impairment was removed, and H1's interface was verified to
+have returned to `qdisc noqueue`.
 
 #### Known limitation
 
