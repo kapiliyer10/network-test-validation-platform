@@ -800,10 +800,9 @@ Milestone 8 verification is complete. The expanded-lab reporting workflow, inten
 
 ### Milestone 9 — CI/CD & End-to-End Validation
 
-**Status:** In progress. Project 2 now uses the expanded Containerlab topology
-for network validation. The latest local pytest run passed all 43
-tests. The updated unified CI workflow still needs to be pushed and verified
-on GitHub Actions.
+**Status:** Complete. Project 2 uses the expanded Containerlab topology
+for network validation. The latest local pytest run passed all 43 tests, and
+the updated unified CI workflow has passed on GitHub Actions.
 
 #### Expanded lab topology
 
@@ -850,17 +849,15 @@ The latest full pytest run was executed against the expanded lab:
 The separate pyATS AEtest scripts are not automatically executed by
 `pytest -v`; they require their own AEtest invocation.
 
-#### Hosted verification and remaining work
+#### Hosted verification
 
-The previous successful GitHub Actions run executed 10 expanded-lab tests,
-all of which passed in 86.02 seconds. That run preceded the migration of
-router discovery and TCP probes into the expanded-lab test group.
+The updated GitHub Actions workflow passed after router discovery and TCP
+probes were migrated into the expanded-lab test group. The workflow runs the
+unit-test/report job followed by the expanded-lab integration/report job.
 
-The updated workflow now selects the expanded-lab marker and is expected to
-include 14 integration tests. This revised workflow must be pushed and its
-GitHub Actions run verified before the updated hosted result can be recorded.
-
-Milestone 9 remains in progress until the updated hosted workflow succeeds.
+Locally, the expanded-lab marker selects 14 integration tests. The earlier
+successful hosted run executed 10 expanded-lab tests before this migration;
+those results are retained here as historical context.
 
 ## 11. Development Principles
 
