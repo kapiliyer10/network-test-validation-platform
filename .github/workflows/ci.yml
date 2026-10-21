@@ -47,3 +47,111 @@ jobs:
           path: artifacts/reports/ci-unit*
           if-no-files-found: warn
           retention-days: 14
+
+  expanded-lab-integration:
+    name: Expanded-lab integration and reports
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out Project 2
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install Project 2 dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip check
+
+      - name: Check out Project 1
+        run: |
+          git clone --depth 1 \
+            https://github.com/kapiliyer10/network-automation-platform.git \
+            "$HOME/network-automation-platform"
+
+      - name: Install Containerlab
+        run: |
+          sudo bash -c "$(curl -sL https://get.containerlab.dev)"
+          containerlab version
+          docker info
+          df -h "$HOME"
+
+      - name: Build endpoint image
+        run: |
+          docker build \
+            -t network-test-endpoint:1.0 \
+            "$HOME/network-automation-platform/topology/tcp-endpoint"
+
+      - name: Deploy expanded lab
+        shell: bash
+        run: |
+          echo "EXPANDED_LAB_DEPLOY_ATTEMPTED=true" >> "$GITHUB_ENV"
+          "$HOME/network-automation-platform/scripts/lab_expanded_up.sh"
+
+      - name: Wait for expanded-lab services
+        shell: bash
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker exec clab-srl-expanded-H1 python3 -c \
+              'import socket; s=socket.create_connection(("10.0.24.2", 18080), timeout=2); s.sendall(b"CI_READY"); response=s.recv(128); s.close(); assert response == b"TCP_OK:CI_READY", response' \
+              >/dev/null 2>&1 \
+              && docker exec clab-srl-expanded-H2 sh -c \
+              'ss -lun | grep -q ":18081"' \
+              && docker exec clab-srl-expanded-H1 python3 -c \
+              'import socket; s=socket.create_connection(("10.0.24.2", 5201), timeout=2); s.close()' \
+              >/dev/null 2>&1; then
+              echo "Expanded-lab endpoint services are responding."
+              exit 0
+            fi
+
+            echo "Waiting for lab services (attempt $attempt of 60)..."
+            sleep 5
+          done
+
+          echo "Expanded-lab services did not become ready."
+          docker ps -a
+          docker logs clab-srl-expanded-H1 || true
+          docker logs clab-srl-expanded-H2 || true
+          exit 1
+
+      - name: Run expanded-lab tests and generate reports
+        run: |
+          python -m scripts.run_test_reports \
+            --markers expanded_lab \
+            --name ci-expanded-lab
+
+      - name: Upload expanded-lab reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: expanded-lab-reports
+          path: artifacts/reports/ci-expanded-lab*
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload packet captures on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: expanded-lab-pcaps
+          path: artifacts/pcap/*.pcap
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Destroy expanded lab
+        if: always()
+        shell: bash
+        run: |
+          if [[ "${EXPANDED_LAB_DEPLOY_ATTEMPTED:-false}" == "true" ]]; then
+            "$HOME/network-automation-platform/scripts/lab_expanded_down.sh"
+          else
+            echo "Cleanup skipped because lab deployment was not attempted."
+          fi
