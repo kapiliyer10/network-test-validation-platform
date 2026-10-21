@@ -905,26 +905,24 @@ Milestone 8 verification is complete. Both topology-specific reporting workflows
 
 ### Milestone 9 — CI/CD & End-to-End Validation
 
-**Status:** In progress. A GitHub Actions workflow has been committed to run
-the unit-test suite and publish its test reports. Local CI-equivalent
-verification passed; execution on GitHub Actions and broader end-to-end
-validation remain outstanding.
+**Status:** In progress. The GitHub Actions unit-test workflow has been
+committed, pushed, and successfully executed. Broader end-to-end validation
+against the live Containerlab/SR Linux network remains outstanding.
 
 #### GitHub Actions workflow
 
-The workflow is defined in `.github/workflows/ci.yml` and is configured to run
-on pushes and pull requests targeting `master` or `main`, and through manual
-workflow dispatch.
+The workflow is defined in `.github/workflows/ci.yml`. It runs on pushes and
+pull requests targeting `master` or `main`, and through manual workflow
+dispatch.
 
-The current job:
+The current hosted job:
 
 - Runs on `ubuntu-latest` using Python 3.12.
 - Installs the pinned project dependencies and checks them with `pip check`.
-- Runs the unit tests and generates four reporting artifacts using
+- Runs unit tests and generates reports using
   `python -m scripts.run_test_reports --markers unit --name ci-unit`.
-- Uploads the generated reports as the `unit-test-reports` workflow artifact,
-  with a 14-day retention period. The upload step is configured to run even
-  when an earlier step fails.
+- Uploads the reports as the `unit-test-reports` workflow artifact, with a
+  14-day retention period. The upload step runs even if an earlier step fails.
 
 #### Local verification
 
@@ -933,22 +931,35 @@ The local equivalent of the workflow completed successfully:
 - Dependency check: `No broken requirements found.`
 - Unit tests: 29 passed, 14 deselected in 0.40s.
 - JUnit XML: 29 test cases, zero failures.
-- HTML, raw JSON, and quality-metrics JSON reports were also generated and
-  checked.
+- HTML, raw JSON, and quality-metrics JSON reports were generated and checked.
 - Generated reports remain under `artifacts/reports/`, which is excluded
   from Git.
+
+#### GitHub Actions verification
+
+The hosted workflow completed successfully:
+
+- The `Unit tests and reports` job succeeded.
+- The `unit-test-reports` artifact was uploaded.
+- The run completed in approximately 36 seconds.
+
+Run details: https://github.com/kapiliyer10/network-test-validation-platform/actions/runs/39537923669
+
+This verifies the hosted unit-test and reporting workflow. The hosted run
+should not be interpreted as evidence that the live network integration tests
+were executed.
 
 Workflow commit: `4f69544` — `Add GitHub Actions unit test workflow`.
 
 #### Remaining work and limitations
 
-The repository currently has no configured Git remote, so the workflow has
-not yet been triggered or verified on GitHub Actions. The current hosted job
-runs unit tests only; it does not deploy the Containerlab/SRL network or run
-the lab-dependent integration suites.
+The current hosted job does not deploy the Containerlab/SR Linux network or
+run the lab-dependent integration suites. Those tests have been verified
+locally against the baseline and expanded labs, but hosted end-to-end execution
+has not been established.
 
-Milestone 9 remains in progress until the workflow is verified on GitHub and
-the remaining CI/end-to-end validation scope is addressed.
+Milestone 9 remains in progress until the remaining CI/end-to-end validation
+scope is addressed.
 
 ## 12. Development Principles
 
