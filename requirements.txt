@@ -46,6 +46,9 @@ pyats.utils==26.9
 pycparser==3.11
 Pygments==2.21.0
 pytest==9.1.1
+pytest-html==4.2.0
+pytest-json-report==1.5.0
+pytest-metadata==3.1.1
 python-engineio==4.9.1
 python-socketio==5.11.2
 PyYAML==6.0.3

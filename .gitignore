@@ -4,3 +4,6 @@ __pycache__/
 
 # Generated packet-capture artifacts
 /artifacts/pcap/
+
+# Generated test reports
+/artifacts/reports/
