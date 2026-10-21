@@ -420,7 +420,7 @@ Status: Complete.
 
 ### Milestone 2 — pytest Framework & Initial Tests
 
-Status: Foundation established.
+Status: Complete.
 
 - Unit and integration test categories
 - pytest markers
