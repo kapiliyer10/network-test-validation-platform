@@ -21,7 +21,7 @@ class CommonSetup(aetest.CommonSetup):
     def validate_testbed(self):
         if not INTERFACE_CASES:
             self.failed(
-                "No interface tests found in configs/lab.yaml"
+                "No interface tests found in configs/lab-expanded.yaml"
             )
 
 

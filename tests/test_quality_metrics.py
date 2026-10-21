@@ -41,7 +41,7 @@ def sample_report():
             },
             {
                 "nodeid": "tests/test_example.py::test_skipped",
-                "keywords": ["original_lab"],
+                "keywords": ["expanded_lab"],
                 "outcome": "skipped",
                 "setup": phase(0.02),
                 "call": phase(0.0, "skipped"),
@@ -78,12 +78,10 @@ def test_category_metrics_and_overlapping_markers(sample_report):
 
     assert categories["integration"]["test_count"] == 1
     assert categories["integration"]["failed"] == 1
-    assert categories["expanded_lab"]["test_count"] == 1
+    assert categories["expanded_lab"]["test_count"] == 2
     assert categories["expanded_lab"]["failed"] == 1
-
-    assert categories["original_lab"]["test_count"] == 1
-    assert categories["original_lab"]["skipped"] == 1
-    assert categories["original_lab"]["pass_rate_percent"] is None
+    assert categories["expanded_lab"]["skipped"] == 1
+    assert categories["expanded_lab"]["pass_rate_percent"] == 0.0
 
 
 def test_failure_detail_preserves_test_phase_and_reason(sample_report):

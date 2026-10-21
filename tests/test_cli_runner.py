@@ -16,7 +16,7 @@ pytestmark = pytest.mark.unit
 def test_successful_command_returns_output(monkeypatch):
     def fake_run(*args, **kwargs):
         assert args[0] == [
-            "docker", "exec", "-i", "clab-srl-lab-R1", "sr_cli"
+            "docker", "exec", "-i", "clab-srl-expanded-R1", "sr_cli"
         ]
         assert kwargs["input"] == "show interface\nquit\n"
         return SimpleNamespace(
@@ -28,7 +28,7 @@ def test_successful_command_returns_output(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     output = run_router_cli_command(
-        "clab-srl-lab-R1",
+        "clab-srl-expanded-R1",
         "show interface",
     )
 
@@ -48,10 +48,10 @@ def test_nonzero_exit_includes_execution_details(monkeypatch):
     )
 
     with pytest.raises(CLIRunnerError) as exc:
-        run_router_cli_command("clab-srl-lab-R1", "show interface")
+        run_router_cli_command("clab-srl-expanded-R1", "show interface")
 
     message = str(exc.value)
-    assert "clab-srl-lab-R1" in message
+    assert "clab-srl-expanded-R1" in message
     assert "show interface" in message
     assert "container error" in message
     assert "Exit code: 1" in message
@@ -70,7 +70,7 @@ def test_cli_parsing_error_is_reported(monkeypatch):
     )
 
     with pytest.raises(CLIRunnerError, match="parsing error"):
-        run_router_cli_command("clab-srl-lab-R1", "invalid command")
+        run_router_cli_command("clab-srl-expanded-R1", "invalid command")
 
 
 @pytest.mark.unit
@@ -86,14 +86,14 @@ def test_timeout_includes_router_and_command(monkeypatch):
 
     with pytest.raises(CLIRunnerError) as exc:
         run_router_cli_command(
-            "clab-srl-lab-R1",
+            "clab-srl-expanded-R1",
             "show interface",
             timeout=2,
         )
 
     message = str(exc.value)
     assert "timed out" in message
-    assert "clab-srl-lab-R1" in message
+    assert "clab-srl-expanded-R1" in message
     assert "show interface" in message
     assert "partial output" in message
 
@@ -106,14 +106,14 @@ def test_missing_docker_executable_is_reported(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     with pytest.raises(CLIRunnerError, match="Could not execute Docker"):
-        run_router_cli_command("clab-srl-lab-R1", "show interface")
+        run_router_cli_command("clab-srl-expanded-R1", "show interface")
 
 
 @pytest.mark.unit
 def test_multiline_command_is_rejected():
     with pytest.raises(ValueError, match="Only one CLI command"):
         run_router_cli_command(
-            "clab-srl-lab-R1",
+            "clab-srl-expanded-R1",
             "show interface\nshow version",
         )
 
@@ -122,7 +122,7 @@ def test_multiline_command_is_rejected():
 def test_nonpositive_timeout_is_rejected():
     with pytest.raises(ValueError, match="timeout must be greater than zero"):
         run_router_cli_command(
-            "clab-srl-lab-R1",
+            "clab-srl-expanded-R1",
             "show interface",
             timeout=0,
         )
@@ -147,7 +147,7 @@ def test_nonzero_exit_can_return_expected_network_failure(monkeypatch):
     )
 
     output = run_router_cli_command(
-        "clab-srl-lab-R1",
+        "clab-srl-expanded-R1",
         "ping 192.0.2.1 network-instance default -c 3",
         check_returncode=False,
     )
@@ -160,7 +160,7 @@ def test_nonzero_exit_can_return_expected_network_failure(monkeypatch):
 def test_multiple_commands_run_in_one_session(monkeypatch):
     def fake_run(args, **kwargs):
         assert args == [
-            "docker", "exec", "-i", "clab-srl-lab-R1", "sr_cli"
+            "docker", "exec", "-i", "clab-srl-expanded-R1", "sr_cli"
         ]
         assert kwargs["input"] == (
             "show version\n"
@@ -177,7 +177,7 @@ def test_multiple_commands_run_in_one_session(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     output = run_router_cli_commands(
-        "clab-srl-lab-R1",
+        "clab-srl-expanded-R1",
         ["show version", "show interface"],
     )
 

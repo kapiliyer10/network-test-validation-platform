@@ -16,9 +16,9 @@ def test_get_running_container(mock_from_env):
     mock_client.containers.get.return_value = mock_container
     mock_from_env.return_value = mock_client
 
-    result = get_container("clab-srl-lab-R1")
+    result = get_container("clab-srl-expanded-R1")
 
-    mock_client.containers.get.assert_called_once_with("clab-srl-lab-R1")
+    mock_client.containers.get.assert_called_once_with("clab-srl-expanded-R1")
     assert result is mock_container
 
 
@@ -32,4 +32,4 @@ def test_get_container_rejects_stopped_container(mock_from_env):
     mock_from_env.return_value = mock_client
 
     with pytest.raises(RuntimeError, match="Container is not running"):
-        get_container("clab-srl-lab-R1")
+        get_container("clab-srl-expanded-R1")

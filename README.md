@@ -130,10 +130,10 @@ Implemented test areas include:
 - ICMP round-trip latency and packet-loss checks, including controlled delay.
 - Automated filtered packet capture for expanded-lab test scenarios.
 
-The native pyATS testbed and custom Docker connection adapter have been
-verified against the baseline SR Linux lab. The adapter reuses the
-existing CLI runner instead of opening a persistent SSH session. Genie
-parsers are not used for SR Linux; structured state is validated using
+The native pyATS testbed and custom Docker connection adapter map logical
+router names to the expanded lab's R1, R2, and R3 containers. The adapter
+reuses the existing CLI runner instead of opening a persistent SSH session.
+Genie parsers are not used for SR Linux; structured state is validated using
 native JSON output and Python's JSON parser where applicable.
 
 ## 4. Relationship with Project 1
@@ -141,27 +141,6 @@ native JSON output and Python's JSON parser where applicable.
 Project 1 owns the network automation implementation and the Containerlab
 topology definitions. Project 2 consumes the resulting lab as a test
 environment and validates its behavior.
-
-Two lab profiles are used for different testing needs.
-
-### Baseline lab — `srl-lab`
-
-The baseline lab contains three Nokia SR Linux routers connected in a
-triangle:
-
-    R1 ------ R2
-     \        /
-      \      /
-        R3
-
-Its container names include:
-
-    clab-srl-lab-R1
-    clab-srl-lab-R2
-    clab-srl-lab-R3
-
-This profile supports router connectivity, interface, OSPF, LLDP, route,
-and failure/recovery validation.
 
 ### Expanded lab — `srl-expanded`
 
@@ -180,9 +159,8 @@ The expanded profile supports TCP/UDP application tests, iperf3 throughput,
 packet-loss and jitter validation, ICMP latency testing, and automated packet
 capture. Its container names use the `clab-srl-expanded-` prefix.
 
-The baseline and expanded profiles are run separately when local resource
-constraints prevent both labs from running simultaneously. Tests must
-target the lab profile they are configured to use.
+Project 2 uses the expanded profile for router validation and endpoint
+traffic testing.
 
 The repositories maintain separate responsibilities, source code,
 dependencies, and test workflows. Project 1 manages the network;
@@ -195,24 +173,11 @@ Before running Project 2, ensure that:
 - Python 3.12 is available.
 - Docker Engine is running and accessible to your user.
 - The Project 1 repository and its Containerlab prerequisites are installed.
-- The Project 1 lab is running and accessible from Project 2.
+- The expanded lab defined in Project 1 is deployed and accessible from Project 2.
 
 The Docker Python package does not install or start Docker Engine.
 
-## 6. Start the Baseline Project 1 Lab
-
-From the Project 1 repository:
-
-    cd ~/network-automation-platform
-    ./scripts/lab_up.sh
-
-Wait for the lab to start before running Project 2 integration tests.
-
-The existing Project 1 topology expects its configuration files beneath
-`~/network-automation-platform`. Keep that location unless the topology
-paths have been deliberately adapted.
-
-## 7. Set Up Project 2
+## 6. Set Up Project 2
 
 Create and activate the Project 2 virtual environment:
 
@@ -238,7 +203,7 @@ Expected output:
 
     No broken requirements found.
 
-## 8. Check Lab Readiness
+## 7. Check Lab Readiness
 
 With the Project 2 environment activated:
 
@@ -249,59 +214,29 @@ containers are present and running.
 
 Expected output when the lab is ready:
 
-    Project 1 lab is READY.
+    Configured lab 'project1-srl-expanded-lab' is READY.
     Running routers: R1, R2, R3
 
 Readiness alone does not prove that routing or connectivity works.
 
-## 9. Run pytest
+## 8. Run pytest
 
-The test suite covers two Containerlab topologies. Run the test group
-that matches the topology currently running. Do not run the entire suite
-with `pytest -q` when only one topology is deployed.
+Project 2 tests target the expanded Containerlab topology. Deploy the
+expanded lab before running the full regression suite.
 
 ### Recommended regression command
 
-When the expanded lab is running, use this command to run the expanded-lab
-tests and the isolated unit-test group:
+Deploy the expanded lab using the instructions in the expanded-lab
+setup section. Then run the complete pytest suite from the Project 2
+repository root:
 
-```bash
-pytest -q -m "expanded_lab or unit"
-```
+    cd ~/network-test-validation-platform
+    source .venv/bin/activate
+    pytest -v
 
-The markers have distinct purposes:
-
-- `unit` selects isolated tests that do not require a live lab.
-- `original_lab` selects tests for the baseline `srl-lab` topology.
-- `expanded_lab` selects tests for `srl-expanded`.
-
-Markers select tests; they do not deploy, stop, or switch topologies.
-Run only the test group that matches the environment currently deployed.
-
-### Run the baseline suite
-
-The baseline `srl-lab` contains R1, R2, and R3.
-
-    pytest -q -m "unit or original_lab"
-
-Last recorded baseline result before the iperf3 performance test was added:
-
-```text
-19 passed, 2 deselected
-```
-
-This result predates the later TCP/UDP performance tests and the UDP
-impairment test. Treat it as historical, not as the current verified result.
-Refresh the baseline result with `srl-lab` running before recording a new result.
-
-Run unit tests independently:
-
-    pytest -q -m unit
-
-Run baseline integration tests independently:
-
-    unset NETWORK_TESTBED_CONFIG
-    pytest -q -m "integration and original_lab"
+This runs the unit tests and expanded-lab integration tests together.
+Pytest does not deploy or destroy the lab; the expanded topology must
+already be running.
 
 ### Run the Expanded-Lab Application, Performance, and Latency Tests
 
@@ -319,15 +254,6 @@ These tests cover:
 - Automated filtered packet capture producing a separate PCAP artifact per test.
 
 #### 1. Prepare the expanded lab
-
-If the baseline `srl-lab` is running and your system cannot accommodate both labs, stop it first.
-
-From the Project 1 repository:
-
-```bash
-cd ~/network-automation-platform
-./scripts/lab_down.sh
-```
 
 Build the endpoint image. It includes the networking utilities, TCP/UDP
 application servers, iperf3, and `tcpdump` for packet capture.
@@ -354,8 +280,9 @@ source .venv/bin/activate
 pytest -q -m expanded_lab
 ```
 
-This selects the ten expanded-lab tests covering TCP/UDP applications, iperf3
-performance, latency, packet-capture generation, and controlled impairments.
+This selects 14 expanded-lab tests covering router discovery, TCP probes,
+TCP/UDP applications, iperf3 performance, latency, packet capture, and
+controlled impairments.
 
 To inspect the selected tests without executing them:
 
@@ -387,13 +314,13 @@ production network or while unrelated traffic uses the interface. If cleanup
 fails or an unexpected interface state is reported, stop and investigate
 before running more tests.
 
-Run the baseline and controlled-delay ICMP latency tests:
+Run the normal and controlled-delay ICMP latency tests:
 
 ```bash
 pytest -v -s tests/integration/test_latency.py
 ```
 
-The baseline test uses BusyBox `ping` to measure minimum, average, and maximum
+The normal latency test uses BusyBox `ping` to measure minimum, average, and maximum
 round-trip time (RTT), as well as packet loss. Its configured limits are an
 average RTT of at most 10 ms and zero packet loss.
 
@@ -436,15 +363,9 @@ cd ~/network-automation-platform
 ./scripts/lab_expanded_down.sh
 ```
 
-To return to the baseline lab:
+Pytest markers select tests; they do not deploy or destroy the expanded lab.
 
-```bash
-./scripts/lab_up.sh
-```
-
-The baseline and expanded labs are separate execution environments. Pytest markers select tests; they do not deploy, destroy, or switch topologies.
-
-## 10. Run pyATS AEtest Suites
+## 9. Run pyATS AEtest Suites
 
 Activate the Project 2 virtual environment before running these commands.
 
@@ -464,14 +385,17 @@ Run route validation:
 
     python tests/aetest/routes.py
 
-The current AEtest suites cover 21 configured validation cases:
+The expanded-lab configuration defines 23 cases for the connectivity,
+interface, OSPF-neighbor, and route AEtest suites:
 
-- 3 ICMP connectivity checks across the configured router pairs
-- 6 Ethernet interface operational-state checks
+- 3 connectivity checks across the configured router pairs
+- 8 interface operational-state checks, including the R1 and R2 endpoint-facing interfaces
 - 6 OSPF neighbor checks covering expected router IDs and FULL adjacency
-  state
 - 6 OSPF-learned remote loopback route checks, including prefix, route
   type, next hop, outgoing interface, and best-route status
+
+It also defines six LLDP neighbor checks, one negative-connectivity case,
+and one failure/recovery scenario for their corresponding AEtest suites.
 
 The tests execute commands through the existing Project 2 testbed and CLI
 runner. The runner uses Docker to invoke the SR Linux CLI within each
@@ -482,7 +406,7 @@ They do not establish native Unicon connection-plugin support or built-in
 Genie parsing for Nokia SR Linux. The route and interface validation
 currently uses parsing tailored to the observed SR Linux CLI output.
 
-## 11. Current Implementation Status
+## 10. Current Implementation Status
 
 ### Milestone 1 — Test Environment & Project 1 Integration
 
@@ -514,7 +438,7 @@ Status: Complete.
 - Command timeouts and failure diagnostics
 - Expanded-lab TCP and UDP application servers
 - Automated TCP/UDP request-response validation from H1 to H2
-- Baseline and expanded-lab tests separated using pytest markers
+- Router and endpoint tests configured to use the expanded lab
 
 ### Milestone 4 — Testbed Abstraction & Native pyATS Integration
 
@@ -526,7 +450,7 @@ Status: Complete.
 - Native pyATS connectivity validation passed
 - Structured interface-state validation passed using SR Linux JSON
 - Native pyATS LLDP validation passed for all six expected Ethernet neighbor relationships
-- Baseline pytest regression suite passed after LLDP integration
+- Pytest regression suite passed after LLDP integration
 - Existing AEtest suites also cover six Ethernet interface operational-state
   checks, six OSPF neighbor adjacencies in FULL state, and six OSPF-learned
   remote loopback routes
@@ -559,7 +483,6 @@ The aggregated CLI output still displayed `Warning: Commit confirmed is still in
 **Latest validation**
 
 - Focused pyATS failure/recovery run: 2 passed, 0 failed.
-- Baseline regression tests using `pytest -q -m "not expanded_lab"`: 27 passed, 10 deselected in 4.52s.
 
 ### Milestone 6 — Traffic & Performance Testing
 
@@ -615,8 +538,8 @@ while unrelated traffic uses the affected interface.
 #### ICMP latency and controlled delay validation
 
 - Added a configuration-driven ICMP latency test using BusyBox `ping`.
-- The baseline test checks minimum, average, and maximum RTT, plus packet loss.
-- The baseline profile requires an average RTT of at most 10 ms and zero packet loss.
+- The normal latency test checks minimum, average, and maximum RTT, plus packet loss.
+- The normal latency profile requires an average RTT of at most 10 ms and zero packet loss.
 - Added a controlled-delay test that applies a temporary 20 ms delay to H1's `eth1` egress interface.
 - The impairment test passes when average RTT reaches at least 15 ms and verifies that the interface returns to `qdisc noqueue` during cleanup.
 
@@ -624,7 +547,7 @@ Verified results:
 
 | Scenario | RTT result | Packet loss | Result |
 | --- | --- | --- | --- |
-| Baseline | Min 0.750 ms, avg 1.001 ms, max 1.266 ms | 0% (5/5 replies) | Passed |
+| No added delay | Min 0.750 ms, avg 1.001 ms, max 1.266 ms | 0% (5/5 replies) | Passed |
 | 20 ms added delay | Average 21.032 ms | 0% | Passed |
 
 The controlled-delay test changes the running lab temporarily. Use it only in
@@ -639,7 +562,7 @@ expanded-lab test group contained ten tests:
 - TCP and UDP application request/response validation.
 - TCP performance profiles at 10, 25, and 50 Mbps.
 - Three UDP scenarios in `test_iperf3_udp.py`: normal performance, packet-loss detection, and jitter detection.
-- Baseline ICMP latency validation.
+- ICMP latency validation.
 - Controlled ICMP delay detection and cleanup.
 
 Before Milestone 7 packet-capture integration, the expanded-lab suite passed:
@@ -667,7 +590,7 @@ performance limits.
 
 ### Milestone 7 — Packet Capture & Troubleshooting
 
-**Status:** Complete. Packet-capture implementation, both topology-specific regressions, Wireshark analysis, and controlled-failure investigation are verified.
+**Status:** Complete. Packet-capture implementation, expanded-lab regression tests, Wireshark analysis, and controlled-failure investigation are verified.
 
 #### Reusable packet-capture utility
 
@@ -699,19 +622,19 @@ no decoded packets.
 
 #### Verification
 
-Latest unit-test result:
+Unit-test result recorded at Milestone 7 completion:
 
 ```text
 23 passed, 14 deselected in 0.21s
 ```
 
-Latest expanded-lab test result:
+Expanded-lab result recorded at Milestone 7 completion:
 
 ```text
 10 passed, 27 deselected in 96.81s
 ```
 
-Latest combined regression result using the README-recommended command
+Combined regression result recorded at Milestone 7 completion using the then-recommended command
 `pytest -q -m "expanded_lab or unit"`:
 
 ```text
@@ -722,15 +645,6 @@ The expanded-lab run verified TCP/UDP exchanges, throughput, packet-loss and
 jitter detection, ICMP latency, PCAP generation, and restoration of `noqueue`
 after controlled impairments. Python compilation and `git diff --check`
 also passed.
-
-The original-lab test group contains four tests: router discovery and three
-TCP-probe cases. With the baseline `srl-lab` deployed, all four tests passed:
-
-    4 passed, 33 deselected in 4.29s
-
-The original-lab tests and expanded-lab tests were run separately against
-their intended topologies. Across the unit, expanded-lab, and original-lab
-runs, all 37 collected tests passed, with no failures.
 
 #### Wireshark analysis and controlled-failure investigation
 
@@ -743,7 +657,7 @@ The following representative captures were opened and inspected in Wireshark.
 - **UDP echo** (`H1_to_H2_udp_echo.pcap`): two UDP datagrams showed the request
   `NETWORK_VALIDATION` and response `UDP_OK:NETWORK_VALIDATION`. This confirms
   the captured exchange, not guaranteed delivery of other UDP datagrams.
-- **Baseline ICMP** (`H1_to_H2_icmp_latency.pcap`): five Echo Requests and
+- **Normal ICMP** (`H1_to_H2_icmp_latency.pcap`): five Echo Requests and
   five matching Echo Replies were visible, with no missing reply among those
   five exchanges.
 - **Normal UDP performance** (`H1_to_H2_udp_10Mbps.pcap`): the inspected
@@ -786,7 +700,7 @@ process-specific shutdown is implemented.
 
 ### Milestone 8 — Reporting & Quality Metrics
 
-**Status:** Complete. JUnit XML, HTML, raw JSON, and quality-metrics reporting are implemented and verified for both baseline and expanded labs. Failure reporting, exit-code propagation, category metrics, and repository checks passed.
+**Status:** Complete. JUnit XML, HTML, raw JSON, and quality-metrics reporting are implemented and verified for unit and expanded-lab test runs. Failure reporting, exit-code propagation, category metrics, and repository checks passed.
 
 #### Reporting outputs
 
@@ -822,14 +736,6 @@ python -m scripts.run_test_reports \
   --name expanded-unit
 ```
 
-For the baseline lab, with `srl-lab` deployed:
-
-```bash
-python -m scripts.run_test_reports \
-  --markers "original_lab or unit" \
-  --name original-unit
-```
-
 Run only the command that matches the currently deployed topology. Pytest markers
 select tests; they do not deploy, stop, or switch labs.
 
@@ -851,7 +757,7 @@ summarizes:
   and average phase duration per test.
 - Failure details, including test ID, failing phase, and the available failure
   message.
-- Results grouped by `unit`, `integration`, `expanded_lab`, and `original_lab`.
+- Results grouped by `unit`, `integration`, and `expanded_lab`.
 
 Category counts can overlap. For example, an expanded-lab test also marked as
 integration is included in both category summaries; category totals must not be
@@ -882,8 +788,6 @@ Verified category counts for that run:
 - Unit: 29 passed.
 - Expanded lab: 10 passed.
 - Integration: 10 passed, overlapping with the expanded-lab category.
-- Original lab: 0 tests in this run because the original-lab group was excluded.
-
 The failure path was also tested using a temporary assertion-failing test. All
 four report formats were generated, the quality JSON retained the test ID,
 failing phase, and assertion message, and the reporting command returned exit
@@ -892,76 +796,73 @@ again with 29 passed and 14 deselected.
 
 The dependency check completed with `No broken requirements found.`
 
-The baseline-lab reporting workflow was also verified with `srl-lab` deployed:
-
-- 33 passed, 10 deselected in 7.05s.
-- JUnit XML contained 33 test cases, with zero failures or errors.
-- Raw JSON recorded 33 passed, 43 collected, and 10 deselected.
-- Quality metrics recorded 29 unit tests and 4 original-lab tests, all passed.
-- All four report artifacts were generated, and generated reports are ignored
-  by Git.
-
-Milestone 8 verification is complete. Both topology-specific reporting workflows, intentional-failure handling, unit tests, dependency consistency, and generated-artifact exclusions were verified.
+Milestone 8 verification is complete. The expanded-lab reporting workflow, intentional-failure handling, unit tests, dependency consistency, and generated-artifact exclusions were verified.
 
 ### Milestone 9 — CI/CD & End-to-End Validation
 
-**Status:** In progress. The GitHub Actions unit-test workflow has been
-committed, pushed, and successfully executed. Broader end-to-end validation
-against the live Containerlab/SR Linux network remains outstanding.
+**Status:** In progress. Project 2 now uses the expanded Containerlab topology
+for network validation. The latest local pytest run passed all 43
+tests. The updated unified CI workflow still needs to be pushed and verified
+on GitHub Actions.
+
+#### Expanded lab topology
+
+Project 2 uses `configs/lab-expanded.yaml` as its default testbed
+configuration. The expanded topology contains three Nokia SR Linux routers
+(R1, R2, R3) and two Linux endpoints (H1, H2).
+
+The expanded topology is used for Project 2's router, connectivity, protocol,
+endpoint-application, performance, latency, failure, and recovery validation
+where applicable. Project 2's pytest and pyATS configurations target this lab.
 
 #### GitHub Actions workflow
 
-The workflow is defined in `.github/workflows/ci.yml`. It runs on pushes and
-pull requests targeting `master` or `main`, and through manual workflow
-dispatch.
+The workflow is defined in `.github/workflows/ci.yml` and runs on pushes and
+pull requests targeting `master` or `main`, as well as through manual
+workflow dispatch.
 
-The current hosted job:
+It contains two jobs:
 
-- Runs on `ubuntu-latest` using Python 3.12.
-- Installs the pinned project dependencies and checks them with `pip check`.
-- Runs unit tests and generates reports using
-  `python -m scripts.run_test_reports --markers unit --name ci-unit`.
-- Uploads the reports as the `unit-test-reports` workflow artifact, with a
-  14-day retention period. The upload step runs even if an earlier step fails.
+- **Unit tests and reports:** installs the pinned dependencies, checks
+  dependency consistency, runs unit tests, and generates the four report
+  formats.
+- **Expanded-lab integration and reports:** checks out Project 1, installs
+  Containerlab, builds the endpoint image, deploys the expanded topology,
+  waits for endpoint services, runs the expanded-lab tests, uploads reports,
+  and destroys the lab even if an earlier step fails.
+
+Reports are stored under `artifacts/reports/`, which is excluded from Git.
+Packet captures are uploaded separately if the expanded-lab integration job
+fails.
 
 #### Local verification
 
-The local equivalent of the workflow completed successfully:
+The latest full pytest run was executed against the expanded lab:
 
-- Dependency check: `No broken requirements found.`
-- Unit tests: 29 passed, 14 deselected in 0.40s.
-- JUnit XML: 29 test cases, zero failures.
-- HTML, raw JSON, and quality-metrics JSON reports were generated and checked.
-- Generated reports remain under `artifacts/reports/`, which is excluded
-  from Git.
+- `pytest -v`: 43 passed in 102.14 seconds.
+- Unit tests: 29 passed.
+- Expanded-lab integration tests: 14 selected, including router discovery,
+  three TCP probes, TCP/UDP application exchanges, throughput, latency, and
+  controlled impairment tests.
+- `pytest --collect-only -q -m expanded_lab`: 14 tests collected and
+  29 deselected.
 
-#### GitHub Actions verification
+The separate pyATS AEtest scripts are not automatically executed by
+`pytest -v`; they require their own AEtest invocation.
 
-The hosted workflow completed successfully:
+#### Hosted verification and remaining work
 
-- The `Unit tests and reports` job succeeded.
-- The `unit-test-reports` artifact was uploaded.
-- The run completed in approximately 36 seconds.
+The previous successful GitHub Actions run executed 10 expanded-lab tests,
+all of which passed in 86.02 seconds. That run preceded the migration of
+router discovery and TCP probes into the expanded-lab test group.
 
-Run details: https://github.com/kapiliyer10/network-test-validation-platform/actions/runs/39537923669
+The updated workflow now selects the expanded-lab marker and is expected to
+include 14 integration tests. This revised workflow must be pushed and its
+GitHub Actions run verified before the updated hosted result can be recorded.
 
-This verifies the hosted unit-test and reporting workflow. The hosted run
-should not be interpreted as evidence that the live network integration tests
-were executed.
+Milestone 9 remains in progress until the updated hosted workflow succeeds.
 
-Workflow commit: `4f69544` — `Add GitHub Actions unit test workflow`.
-
-#### Remaining work and limitations
-
-The current hosted job does not deploy the Containerlab/SR Linux network or
-run the lab-dependent integration suites. Those tests have been verified
-locally against the baseline and expanded labs, but hosted end-to-end execution
-has not been established.
-
-Milestone 9 remains in progress until the remaining CI/end-to-end validation
-scope is addressed.
-
-## 12. Development Principles
+## 11. Development Principles
 
 - Keep Project 1 and Project 2 separate.
 - Reuse the existing network instead of rebuilding its configuration

@@ -21,7 +21,7 @@ class CommonSetup(aetest.CommonSetup):
     @aetest.subsection
     def validate_testbed(self):
         if not CONNECTIVITY_CASES:
-            self.failed("No connectivity tests found in configs/lab.yaml")
+            self.failed("No connectivity tests found in configs/lab-expanded.yaml")
 
 
 class ConnectivityValidation(aetest.Testcase):

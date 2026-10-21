@@ -1,12 +1,12 @@
 testbed:
-  name: srl-lab-pyats-poc
+  name: srl-expanded-pyats
 
 devices:
   R1:
     type: router
     os: srlinux
     custom:
-      container_name: clab-srl-lab-R1
+      container_name: clab-srl-expanded-R1
     connections:
       cli:
         class: src.pyats_docker_connection.DockerSRLConnection
@@ -16,7 +16,7 @@ devices:
     type: router
     os: srlinux
     custom:
-      container_name: clab-srl-lab-R2
+      container_name: clab-srl-expanded-R2
     connections:
       cli:
         class: src.pyats_docker_connection.DockerSRLConnection
@@ -26,7 +26,7 @@ devices:
     type: router
     os: srlinux
     custom:
-      container_name: clab-srl-lab-R3
+      container_name: clab-srl-expanded-R3
     connections:
       cli:
         class: src.pyats_docker_connection.DockerSRLConnection

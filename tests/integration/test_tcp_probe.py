@@ -1,4 +1,4 @@
-"""TCP probe response tests for the SR Linux lab."""
+"""TCP probe response tests for the expanded SR Linux lab."""
 
 from pathlib import Path
 import re
@@ -8,13 +8,13 @@ import yaml
 
 from src.cli_runner import run_router_cli_command
 
-pytestmark = pytest.mark.original_lab
+pytestmark = pytest.mark.expanded_lab
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 CONFIG_PATH = Path(
     os.environ.get(
         "NETWORK_TESTBED_CONFIG",
-        str(PROJECT_ROOT / "configs" / "lab.yaml"),
+        str(PROJECT_ROOT / "configs" / "lab-expanded.yaml"),
     )
 ).expanduser()
 

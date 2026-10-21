@@ -12,7 +12,7 @@ from pyats.topology import loader
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-CONFIG_PATH = PROJECT_ROOT / "configs" / "lab.yaml"
+CONFIG_PATH = PROJECT_ROOT / "configs" / "lab-expanded.yaml"
 TESTBED_PATH = PROJECT_ROOT / "configs" / "pyats-testbed.yaml"
 
 with CONFIG_PATH.open(encoding="utf-8") as config_file:
@@ -41,7 +41,7 @@ class CommonSetup(aetest.CommonSetup):
         if TEST_CASE is None:
             self.failed(
                 f"Interface scenario {TEST_CASE_NAME!r} "
-                "was not found in configs/lab.yaml"
+                "was not found in configs/lab-expanded.yaml"
             )
 
         router_name = TEST_CASE["router"]

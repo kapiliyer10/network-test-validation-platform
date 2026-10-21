@@ -4,14 +4,14 @@ import sys
 from docker.errors import DockerException
 
 from src.lab_discovery import discover_lab_routers
-
-
-EXPECTED_ROUTERS = {"R1", "R2", "R3"}
+from src.testbed import Testbed
 
 
 def main() -> int:
     """Verify that the Project 1 lab is ready for testing."""
     try:
+        testbed = Testbed.from_yaml()
+        expected_routers = set(testbed.routers)
         routers = discover_lab_routers()
     except DockerException as exc:
         print(
@@ -20,25 +20,25 @@ def main() -> int:
         )
         return 1
 
-    missing = EXPECTED_ROUTERS - routers.keys()
+    missing = expected_routers - routers.keys()
     stopped = {
         name: routers[name].status
-        for name in EXPECTED_ROUTERS & routers.keys()
+        for name in expected_routers & routers.keys()
         if routers[name].status != "running"
     }
 
     if missing or stopped:
-        print("Project 1 lab is NOT READY.")
+        print(f"Configured lab {testbed.name!r} is NOT READY.")
 
         for name in sorted(missing):
-            print(f"  MISSING: clab-srl-lab-{name}")
+            print(f"  MISSING: {testbed.routers[name].container_name}")
 
         for name, status in sorted(stopped.items()):
             print(f"  NOT RUNNING: {name} (status: {status})")
 
         return 1
 
-    print("Project 1 lab is READY.")
+    print(f"Configured lab {testbed.name!r} is READY.")
     print("Running routers: R1, R2, R3")
     return 0
 

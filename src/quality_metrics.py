@@ -10,7 +10,6 @@ REPORT_CATEGORIES = (
     "unit",
     "integration",
     "expanded_lab",
-    "original_lab",
 )
 
 TEST_PHASES = ("setup", "call", "teardown")

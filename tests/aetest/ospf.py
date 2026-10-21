@@ -23,7 +23,7 @@ class CommonSetup(aetest.CommonSetup):
     def validate_testbed(self):
         if not OSPF_CASES:
             self.failed(
-                "No OSPF neighbor tests found in configs/lab.yaml"
+                "No OSPF neighbor tests found in configs/lab-expanded.yaml"
             )
 
 

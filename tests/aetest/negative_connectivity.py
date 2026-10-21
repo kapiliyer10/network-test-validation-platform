@@ -12,7 +12,7 @@ from pyats.topology import loader
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-CONFIG_PATH = PROJECT_ROOT / "configs" / "lab.yaml"
+CONFIG_PATH = PROJECT_ROOT / "configs" / "lab-expanded.yaml"
 TESTBED_PATH = PROJECT_ROOT / "configs" / "pyats-testbed.yaml"
 
 with CONFIG_PATH.open(encoding="utf-8") as config_file:
@@ -36,7 +36,7 @@ class CommonSetup(aetest.CommonSetup):
         if not TEST_CASES:
             self.failed(
                 "No negative connectivity tests found "
-                "in configs/lab.yaml"
+                "in configs/lab-expanded.yaml"
             )
 
         for case in TEST_CASES:

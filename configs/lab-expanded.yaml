@@ -249,3 +249,63 @@ iperf3_udp_jitter_tests:
     base_delay_ms: 20
     delay_variation_ms: 5
     min_observed_jitter_ms: 1.0
+
+lldp_neighbor_tests:
+  - name: R1_ethernet_1_1_to_R2_ethernet_1_1
+    router: R1
+    local_interface: ethernet-1/1
+    expected_neighbor: R2
+    expected_neighbor_port: ethernet-1/1
+
+  - name: R1_ethernet_1_2_to_R3_ethernet_1_2
+    router: R1
+    local_interface: ethernet-1/2
+    expected_neighbor: R3
+    expected_neighbor_port: ethernet-1/2
+
+  - name: R2_ethernet_1_1_to_R1_ethernet_1_1
+    router: R2
+    local_interface: ethernet-1/1
+    expected_neighbor: R1
+    expected_neighbor_port: ethernet-1/1
+
+  - name: R2_ethernet_1_2_to_R3_ethernet_1_1
+    router: R2
+    local_interface: ethernet-1/2
+    expected_neighbor: R3
+    expected_neighbor_port: ethernet-1/1
+
+  - name: R3_ethernet_1_1_to_R2_ethernet_1_2
+    router: R3
+    local_interface: ethernet-1/1
+    expected_neighbor: R2
+    expected_neighbor_port: ethernet-1/2
+
+  - name: R3_ethernet_1_2_to_R1_ethernet_1_2
+    router: R3
+    local_interface: ethernet-1/2
+    expected_neighbor: R1
+    expected_neighbor_port: ethernet-1/2
+
+negative_connectivity_tests:
+  - name: R1_to_unreachable_documentation_address
+    source: R1
+    destination: 192.0.2.1
+    expected_transmitted: 3
+    expected_received: 0
+    expected_packet_loss_percent: 100
+
+failure_recovery_tests:
+  - name: R1_R2_link_failure_and_recovery
+    router: R1
+    interface: ethernet-1/1
+    destination: 10.0.12.2
+    expected_packets: 3
+    rollback_timeout_seconds: 300
+
+    failover_destination: 10.255.0.2
+    expected_failover_next_hop: 10.0.31.2
+    expected_failover_interface: ethernet-1/2.0
+    expected_recovery_next_hop: 10.0.12.2
+    expected_recovery_interface: ethernet-1/1.0
+    convergence_timeout_seconds: 60

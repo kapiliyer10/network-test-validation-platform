@@ -18,7 +18,7 @@ from src.commit_state import (
     parse_commit_statuses,
 )
 
-CONFIG_PATH = PROJECT_ROOT / "configs" / "lab.yaml"
+CONFIG_PATH = PROJECT_ROOT / "configs" / "lab-expanded.yaml"
 TESTBED_PATH = PROJECT_ROOT / "configs" / "pyats-testbed.yaml"
 
 def _candidate_diff_lines(output: str) -> list[str]:
@@ -106,7 +106,7 @@ class CommonSetup(aetest.CommonSetup):
     def validate_testbed(self):
         if not TEST_CASES:
             self.failed(
-                "No failure-recovery tests found in configs/lab.yaml"
+                "No failure-recovery tests found in configs/lab-expanded.yaml"
             )
 
         for case in TEST_CASES:

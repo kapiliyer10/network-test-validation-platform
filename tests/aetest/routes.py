@@ -33,7 +33,7 @@ class CommonSetup(aetest.CommonSetup):
     @aetest.subsection
     def validate_testbed(self):
         if not ROUTE_CASES:
-            self.failed("No route tests found in configs/lab.yaml")
+            self.failed("No route tests found in configs/lab-expanded.yaml")
 
 
 class RouteValidation(aetest.Testcase):

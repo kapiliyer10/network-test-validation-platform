@@ -12,7 +12,7 @@ from src.cli_runner import run_router_cli_command
 DEFAULT_CONFIG_PATH = (
     Path(__file__).resolve().parents[1]
     / "configs"
-    / "lab.yaml"
+    / "lab-expanded.yaml"
 )
 
 
