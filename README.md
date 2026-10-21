@@ -903,6 +903,53 @@ The baseline-lab reporting workflow was also verified with `srl-lab` deployed:
 
 Milestone 8 verification is complete. Both topology-specific reporting workflows, intentional-failure handling, unit tests, dependency consistency, and generated-artifact exclusions were verified.
 
+### Milestone 9 — CI/CD & End-to-End Validation
+
+**Status:** In progress. A GitHub Actions workflow has been committed to run
+the unit-test suite and publish its test reports. Local CI-equivalent
+verification passed; execution on GitHub Actions and broader end-to-end
+validation remain outstanding.
+
+#### GitHub Actions workflow
+
+The workflow is defined in `.github/workflows/ci.yml` and is configured to run
+on pushes and pull requests targeting `master` or `main`, and through manual
+workflow dispatch.
+
+The current job:
+
+- Runs on `ubuntu-latest` using Python 3.12.
+- Installs the pinned project dependencies and checks them with `pip check`.
+- Runs the unit tests and generates four reporting artifacts using
+  `python -m scripts.run_test_reports --markers unit --name ci-unit`.
+- Uploads the generated reports as the `unit-test-reports` workflow artifact,
+  with a 14-day retention period. The upload step is configured to run even
+  when an earlier step fails.
+
+#### Local verification
+
+The local equivalent of the workflow completed successfully:
+
+- Dependency check: `No broken requirements found.`
+- Unit tests: 29 passed, 14 deselected in 0.40s.
+- JUnit XML: 29 test cases, zero failures.
+- HTML, raw JSON, and quality-metrics JSON reports were also generated and
+  checked.
+- Generated reports remain under `artifacts/reports/`, which is excluded
+  from Git.
+
+Workflow commit: `4f69544` — `Add GitHub Actions unit test workflow`.
+
+#### Remaining work and limitations
+
+The repository currently has no configured Git remote, so the workflow has
+not yet been triggered or verified on GitHub Actions. The current hosted job
+runs unit tests only; it does not deploy the Containerlab/SRL network or run
+the lab-dependent integration suites.
+
+Milestone 9 remains in progress until the workflow is verified on GitHub and
+the remaining CI/end-to-end validation scope is addressed.
+
 ## 12. Development Principles
 
 - Keep Project 1 and Project 2 separate.
