@@ -170,54 +170,82 @@ Project 2 measures and validates its behavior.
 
 Before running Project 2, ensure that:
 
-- Python 3.12 is available.
-- Docker Engine is running and accessible to your user.
-- The Project 1 repository and its Containerlab prerequisites are installed.
-- The expanded lab defined in Project 1 is deployed and accessible from Project 2.
+- Python 3.12 is installed.
+- Docker Engine is installed, running, and accessible to your user.
+- Containerlab is installed.
+- Git is installed.
 
-The Docker Python package does not install or start Docker Engine.
+Project 2 reuses the `srl-expanded` topology from Project 1. The setup
+script automatically clones Project 1 into `~/network-automation-platform`
+if it is not already present.
 
-## 6. Set Up Project 2
+An existing Project 1 checkout is reused without pulling or modifying
+its Git history or working-tree changes.
 
-Create and activate the Project 2 virtual environment:
+## 6. Set Up the Environment
 
-    cd ~/network-test-validation-platform
+From the Project 2 repository root, run:
 
-    python3.12 -m venv .venv
-    source .venv/bin/activate
+```bash
+./scripts/setup_environment.sh
+```
 
-Install the pinned dependencies:
+The script:
 
-    python -m pip install --upgrade pip
-    python -m pip install -r requirements.txt
+1. Checks Python, Docker, Containerlab, and Git prerequisites.
+2. Clones Project 1 if the expected repository directory is absent.
+3. Creates Project 2's `.venv` virtual environment.
+4. Installs the pinned dependencies from `requirements.txt`.
+5. Checks Python dependency consistency.
+6. Builds the `network-test-endpoint:1.0` image.
+7. Deploys Project 1's expanded `srl-expanded` topology when necessary.
+8. Waits for the TCP echo, UDP listener, and iperf3 endpoint services.
+9. Runs the Project 2 router-readiness check.
 
-The requirements file includes the verified pyATS 26.9 dependency set
-alongside the project's existing Python dependencies. Genie is not
-currently included.
+The script does not install system-level Docker or Containerlab packages.
+Those prerequisites must be installed separately.
 
-Check dependency health:
+By default, Project 1 is expected at:
 
-    python -m pip check
+```text
+~/network-automation-platform
+```
 
-Expected output:
+To use another Project 1 checkout location:
 
-    No broken requirements found.
+```bash
+PROJECT1_DIR="$HOME/projects/network-automation-platform" \
+  ./scripts/setup_environment.sh
+```
+
+### Activate the virtual environment
+
+```bash
+source .venv/bin/activate
+```
+
+### Verify the environment
+
+```bash
+python -m pip check
+python -m scripts.check_lab_readiness
+```
 
 ## 7. Check Lab Readiness
 
-With the Project 2 environment activated:
+The setup script automatically performs the router-readiness check after
+deploying the expanded lab.
 
-    python -m scripts.check_lab_readiness
+To run the check again manually:
 
-The check verifies that Docker is accessible and the required router
-containers are present and running.
+```bash
+source .venv/bin/activate
+python -m scripts.check_lab_readiness
+```
 
-Expected output when the lab is ready:
-
-    Configured lab 'project1-srl-expanded-lab' is READY.
-    Running routers: R1, R2, R3
-
-Readiness alone does not prove that routing or connectivity works.
+The check verifies Docker accessibility and confirms that the configured
+router containers are present and running. It does not independently
+validate routing or end-to-end connectivity.
 
 ## 8. Run pytest
 
@@ -226,9 +254,8 @@ expanded lab before running the full regression suite.
 
 ### Recommended regression command
 
-Deploy the expanded lab using the instructions in the expanded-lab
-setup section. Then run the complete pytest suite from the Project 2
-repository root:
+Run the one-command environment setup from Section 6 before executing
+the complete pytest suite from the Project 2 repository root:
 
     cd ~/network-test-validation-platform
     source .venv/bin/activate
@@ -255,20 +282,31 @@ These tests cover:
 
 #### 1. Prepare the expanded lab
 
-Build the endpoint image. It includes the networking utilities, TCP/UDP
-application servers, iperf3, and `tcpdump` for packet capture.
+The recommended setup command builds the endpoint image and deploys the
+expanded topology:
 
 ```bash
-docker build -t network-test-endpoint:1.0 topology/tcp-endpoint
+./scripts/setup_environment.sh
 ```
 
-Deploy the expanded topology:
+Run this command from the Project 2 repository root. If the environment
+is already deployed and its services are ready, the script reuses it.
+
+To manually rebuild the endpoint image:
 
 ```bash
-./scripts/lab_expanded_up.sh
+docker build -t network-test-endpoint:1.0 \
+  "$HOME/network-automation-platform/topology/tcp-endpoint"
 ```
 
-The expanded topology configures the H1 and H2 interfaces with an MTU of 1500 bytes. It also starts the iperf3 server on H2.
+To manually redeploy the topology:
+
+```bash
+"$HOME/network-automation-platform/scripts/lab_expanded_up.sh"
+```
+
+The expanded topology configures the H1 and H2 interfaces with an MTU of
+1500 bytes. It also starts the iperf3 server on H2.
 
 #### 2. Run the expanded-lab test group
 
@@ -545,10 +583,10 @@ while unrelated traffic uses the affected interface.
 
 Verified results:
 
-| Scenario | RTT result | Packet loss | Result |
-| --- | --- | --- | --- |
-| No added delay | Min 0.750 ms, avg 1.001 ms, max 1.266 ms | 0% (5/5 replies) | Passed |
-| 20 ms added delay | Average 21.032 ms | 0% | Passed |
+| Scenario          | RTT result                               | Packet loss      | Result |
+| ----------------- | ---------------------------------------- | ---------------- | ------ |
+| No added delay    | Min 0.750 ms, avg 1.001 ms, max 1.266 ms | 0% (5/5 replies) | Passed |
+| 20 ms added delay | Average 21.032 ms                        | 0%               | Passed |
 
 The controlled-delay test changes the running lab temporarily. Use it only in
 the expanded test lab, not on a production network or while unrelated traffic
@@ -788,11 +826,11 @@ Verified category counts for that run:
 - Unit: 29 passed.
 - Expanded lab: 10 passed.
 - Integration: 10 passed, overlapping with the expanded-lab category.
-The failure path was also tested using a temporary assertion-failing test. All
-four report formats were generated, the quality JSON retained the test ID,
-failing phase, and assertion message, and the reporting command returned exit
-code 1. The temporary test was removed afterward, and the unit suite passed
-again with 29 passed and 14 deselected.
+  The failure path was also tested using a temporary assertion-failing test. All
+  four report formats were generated, the quality JSON retained the test ID,
+  failing phase, and assertion message, and the reporting command returned exit
+  code 1. The temporary test was removed afterward, and the unit suite passed
+  again with 29 passed and 14 deselected.
 
 The dependency check completed with `No broken requirements found.`
 
@@ -838,7 +876,7 @@ fails.
 
 The latest full pytest run was executed against the expanded lab:
 
-- `pytest -v`: 43 passed in 102.14 seconds.
+- `pytest -v`: 43 passed in 103.07 seconds.
 - Unit tests: 29 passed.
 - Expanded-lab integration tests: 14 selected, including router discovery,
   three TCP probes, TCP/UDP application exchanges, throughput, latency, and
@@ -858,6 +896,45 @@ unit-test/report job followed by the expanded-lab integration/report job.
 Locally, the expanded-lab marker selects 14 integration tests. The earlier
 successful hosted run executed 10 expanded-lab tests before this migration;
 those results are retained here as historical context.
+
+#### Jenkins pipeline (additional CI option)
+
+The repository also includes a declarative Jenkins pipeline in `Jenkinsfile`.
+It provides an alternative CI execution path alongside GitHub Actions.
+
+The Jenkins agent must be Linux-based and have the `network-lab` label.
+It requires:
+
+- Python 3.12
+- Docker Engine with access to the Docker daemon
+- Containerlab
+- Git
+- Jenkins Pipeline and JUnit reporting support
+
+The pipeline contains the following stages:
+
+1. Validate agent prerequisites and inspect the existing expanded-lab state.
+2. Run `scripts/setup_environment.sh` to prepare Project 1 and Project 2.
+3. Run unit tests and generate JUnit XML, HTML, JSON, and quality-metrics reports.
+4. Run expanded-lab integration tests and generate the same report formats.
+
+JUnit XML results are published to Jenkins. HTML, JSON, and quality-metrics
+files are archived as build artifacts. PCAP files are archived when a build
+fails.
+
+The pipeline disables concurrent builds to prevent simultaneous changes to
+the shared network lab.
+
+Lab cleanup depends on the state detected before the build:
+
+- If the expanded lab was already running, Jenkins preserves it.
+- If no expanded-lab containers existed, Jenkins removes containers created
+  during the build.
+- If a partial lab already existed, the pipeline stops before deployment so
+  that the existing environment can be investigated.
+
+**Execution status:** The Jenkinsfile has been added and reviewed locally.
+A Jenkins server with the required agent has not yet executed this pipeline.
 
 ## 11. Development Principles
 
