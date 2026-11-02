@@ -17,7 +17,7 @@ pipeline {
     stages {
         stage('Validate Jenkins Agent') {
             steps {
-                sh '''
+                sh '''#!/usr/bin/env bash
                     #!/usr/bin/env bash
                     set -euo pipefail
 
@@ -88,7 +88,7 @@ pipeline {
 
         stage('Set Up Environment') {
             steps {
-                sh '''
+                sh '''#!/usr/bin/env bash
                     set -euo pipefail
 
                     PROJECT1_DIR="$PROJECT1_DIR" \
@@ -99,7 +99,7 @@ pipeline {
 
         stage('Unit Tests and Reports') {
             steps {
-                sh '''
+                sh '''#!/usr/bin/env bash
                     set -euo pipefail
 
                     .venv/bin/python -m scripts.run_test_reports \
@@ -111,7 +111,7 @@ pipeline {
 
         stage('Expanded-Lab Integration Tests and Reports') {
             steps {
-                sh '''
+                sh '''#!/usr/bin/env bash
                     set -euo pipefail
 
                     .venv/bin/python -m scripts.run_test_reports \
