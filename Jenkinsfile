@@ -10,7 +10,6 @@ pipeline {
     }
 
     environment {
-        PROJECT1_DIR = "${WORKSPACE}/network-automation-platform"
         LAB_STATE = 'UNKNOWN'
     }
 
@@ -91,7 +90,7 @@ pipeline {
                 sh '''#!/usr/bin/env bash
                     set -euo pipefail
 
-                    PROJECT1_DIR="$PROJECT1_DIR" \
+                    PROJECT1_DIR="$HOME/network-automation-platform" \
                         ./scripts/setup_environment.sh
                 '''
             }
@@ -150,7 +149,7 @@ pipeline {
                         def cleanupStatus = sh(
                             script: '''#!/usr/bin/env bash
                                 set -euo pipefail
-                                "$PROJECT1_DIR/scripts/lab_expanded_down.sh"
+                                "$HOME/network-automation-platform/scripts/lab_expanded_down.sh"
                             ''',
                             returnStatus: true
                         )
