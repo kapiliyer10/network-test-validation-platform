@@ -6,7 +6,7 @@ A Python-based network testing and validation framework for a containerized Noki
 
 The platform validates connectivity, protocol behavior, routing, failure recovery, application traffic, and network performance using pytest, pyATS, Docker, and Containerlab.
 
-**Project 1 manages the network. Project 2 validates its behavior.**
+**`network-automation-platform` manages the network. `network-test-validation-platform` validates its behavior.**
 
 ---
 
@@ -18,14 +18,14 @@ Its workflow is:
 
 **Define expected behavior → Execute tests → Observe network behavior → Compare results → Collect diagnostic evidence → Generate reports**
 
-The project is designed as a separate repository from the Network Automation & Programmability Platform.
+This repository (`network-test-validation-platform`) is maintained separately from `network-automation-platform`.
 
-| Project | Responsibility |
+| Repository | Responsibility |
 |---|---|
-| Project 1 — Network Automation | Device state discovery, desired-state configuration, drift detection, and configuration management |
-| Project 2 — Network Validation | Connectivity, protocol, traffic, performance, failure, recovery, and regression testing |
+| `network-automation-platform` — Network Automation | Device state discovery, desired-state configuration, drift detection, and configuration management |
+| `network-test-validation-platform` — Network Validation | Connectivity, protocol, traffic, performance, failure, recovery, and regression testing |
 
-Project 2 reuses Project 1's expanded Containerlab topology instead of duplicating its network configuration and management implementation.
+`network-test-validation-platform` reuses `network-automation-platform`'s expanded Containerlab topology instead of duplicating its network configuration and management implementation.
 
 ## 2. Key Features
 
@@ -43,8 +43,8 @@ Project 2 reuses Project 1's expanded Containerlab topology instead of duplicati
 ### Application and traffic validation
 
 - TCP and UDP application request/response testing.
-- TCP throughput testing at 10, 25, and 50 Mbps.
-- UDP throughput, packet-loss, and jitter testing.
+- TCP iperf3 tests with configured target bitrates of 10, 25, and 50 Mbps, with receiver-throughput and retransmission thresholds.
+- UDP iperf3 tests with configured target bitrates and receiver-throughput, packet-loss, and jitter thresholds.
 - Controlled packet-loss and delay experiments.
 - ICMP round-trip latency and packet-loss measurements.
 - Automated packet capture using tcpdump.
@@ -62,7 +62,7 @@ Project 2 reuses Project 1's expanded Containerlab topology instead of duplicati
 
 ## 3. Architecture
 
-Project 2 combines two validation paths:
+`network-test-validation-platform` combines two validation paths:
 
 1. Router and protocol testing through pytest, pyATS AEtest, a shared testbed abstraction, and the Docker-based CLI runner.
 2. Traffic and performance testing through dedicated Linux endpoints H1 and H2 connected through the SR Linux network.
@@ -73,19 +73,19 @@ The detailed test execution instructions are available in **[Test Execution and 
 
 ## 4. Network Topology
 
-Project 2 uses Project 1's expanded `srl-expanded` topology.
+`network-test-validation-platform` uses `network-automation-platform`'s expanded `srl-expanded` topology.
 
 It contains three Nokia SR Linux routers and two Linux traffic endpoints.
 
 ```text
-                  R1
-                 /  \
-                /    \
-               /      \
-              R3------R2
-              |        |
-              |        |
-             H1        H2
+             H1
+              |
+              R1
+             /  \
+            /    \
+           R3----R2
+                  |
+                  H2
 ```
 
 The routed traffic path between endpoints is:
@@ -105,9 +105,9 @@ The expanded lab uses the container prefix:
 
 `clab-srl-expanded-`
 
-Project 1 owns the topology definition and startup/shutdown scripts. Project 2 consumes the running lab for validation.
+`network-automation-platform` owns the topology definition and startup/shutdown scripts. `network-test-validation-platform` consumes the running lab for validation.
 
-See **[Network Topology and Project 1 Relationship](docs/architecture.md)** for more detail.
+See **[System Architecture and Automation Repository Relationship](docs/architecture.md)** for more detail.
 
 ## 5. Technology Stack
 
@@ -128,7 +128,7 @@ Genie parsers are not used for SR Linux in this implementation. Structured route
 
 ## 6. Prerequisites
 
-Before running Project 2, install:
+Before running `network-test-validation-platform`, install:
 
 - Python 3.12.
 - Docker Engine.
@@ -141,7 +141,7 @@ The setup script checks these prerequisites but does not install system-level Do
 
 ## 7. Set Up the Environment
 
-Clone Project 2:
+Clone `network-test-validation-platform`:
 
 ```bash
 git clone https://github.com/kapiliyer10/network-test-validation-platform.git
@@ -157,29 +157,29 @@ Run the one-command environment setup:
 The script:
 
 1. Checks the required tools and environment.
-2. Clones Project 1 if the expected checkout does not exist.
-3. Creates the Project 2 virtual environment.
+2. Clones `network-automation-platform` if the expected checkout does not exist.
+3. Creates the `network-test-validation-platform` virtual environment.
 4. Installs the pinned Python dependencies.
 5. Checks dependency consistency.
 6. Builds the Linux endpoint Docker image.
-7. Deploys Project 1's expanded topology when necessary.
+7. Deploys `network-automation-platform`'s expanded topology when necessary.
 8. Waits for endpoint services.
 9. Checks router readiness.
 
-An existing Project 1 checkout is reused without pulling or modifying its Git history or working-tree changes.
+An existing `network-automation-platform` checkout is reused without pulling or modifying its Git history or working-tree changes.
 
-By default, Project 1 is expected at:
+By default, `network-automation-platform` is expected at:
 
 `~/network-automation-platform`
 
-To select a different Project 1 checkout:
+To select a different `network-automation-platform` checkout:
 
 ```bash
 PROJECT1_DIR="$HOME/projects/network-automation-platform" \
   ./scripts/setup_environment.sh
 ```
 
-Activate the Project 2 virtual environment:
+Activate the `network-test-validation-platform` virtual environment:
 
 ```bash
 source .venv/bin/activate
@@ -217,7 +217,7 @@ pytest -q -m expanded_lab
 pytest -v
 ```
 
-The latest recorded local full-suite result was:
+A recorded local full-suite run completed with:
 
 ```text
 43 passed in 103.07s
@@ -266,7 +266,7 @@ python -m scripts.run_test_reports \
 
 ## 10. CI/CD
 
-Project 2 supports two CI execution environments.
+`network-test-validation-platform` supports two CI execution environments.
 
 ### GitHub Actions
 
@@ -285,7 +285,7 @@ It contains two jobs:
 1. Unit tests and reports.
 2. Expanded-lab integration tests and reports.
 
-The expanded-lab job checks out Project 1, installs Containerlab, builds the endpoint image, deploys the expanded topology, waits for endpoint services, runs tests, uploads reports, and destroys the lab.
+The expanded-lab job checks out `network-automation-platform`, installs Containerlab, builds the endpoint image, deploys the expanded topology, waits for endpoint services, runs tests, uploads reports, and destroys the lab.
 
 ### Jenkins
 
@@ -293,7 +293,7 @@ The repository also includes a Declarative Pipeline:
 
 `Jenkinsfile`
 
-The Jenkins job retrieves Project 2 from GitHub and executes the same main validation workflow.
+The Jenkins job retrieves `network-test-validation-platform` from GitHub and executes the same main validation workflow.
 
 Pipeline stages:
 
@@ -304,9 +304,9 @@ Pipeline stages:
 
 Jenkins publishes JUnit XML results and archives HTML, JSON, quality-metrics, and failure-related PCAP artifacts.
 
-The local Jenkins installation uses the Built-In Node with the `network-lab` label. The job currently uses manual **Build Now** execution; automatic GitHub webhook triggering has not been configured.
+The local Jenkins installation uses the Built-In Node with the `network-lab` label.
 
-**Verified Jenkins execution:** Build #7 completed successfully, and the Jenkins dashboard reported no test failures. Eight reporting artifacts were archived.
+**Recorded local Jenkins verification:** Build #7 completed successfully, the Jenkins dashboard reported no test failures, and eight reporting artifacts were archived. It was manually triggered using **Build Now**; automatic GitHub webhook triggering is not configured.
 
 See the milestone document for the recorded verification history.
 
@@ -374,7 +374,7 @@ The full milestone history and its verification records are maintained in **[Imp
 
 ## 14. Development Principles
 
-- Keep Project 1 and Project 2 separate.
+- Keep `network-automation-platform` and `network-test-validation-platform` separate.
 - Reuse the existing network rather than rebuilding its configuration-management implementation.
 - Validate observable network behavior.
 - Distinguish diagnostic responses from successful application-level communication.
