@@ -1,8 +1,8 @@
-# Project 2 — Implementation Milestones
+# Network Test and Validation Platform — Implementation Milestones
 
-This document preserves the development history, implementation details, verification records, and completion status of all nine Project 2 milestones.
+This document preserves the development history, implementation details, verification records, and completion status of all nine Network Test and Validation Platform milestones.
 
-### Milestone 1 — Test Environment & Project 1 Integration
+### Milestone 1 — Test Environment & Network Automation Platform Project Integration
 
 Status: Complete.
 
@@ -394,19 +394,19 @@ Milestone 8 verification is complete. The expanded-lab reporting workflow, inten
 
 ### Milestone 9 — CI/CD & End-to-End Validation
 
-**Status:** Complete. Project 2 uses the expanded Containerlab topology
+**Status:** Complete. Network Test and Validation Platform uses the expanded Containerlab topology
 for network validation. The latest local pytest run passed all 43 tests, and
 the updated unified CI workflow has passed on GitHub Actions.
 
 #### Expanded lab topology
 
-Project 2 uses `configs/lab-expanded.yaml` as its default testbed
+Network Test and Validation Platform uses `configs/lab-expanded.yaml` as its default testbed
 configuration. The expanded topology contains three Nokia SR Linux routers
 (R1, R2, R3) and two Linux endpoints (H1, H2).
 
-The expanded topology is used for Project 2's router, connectivity, protocol,
+The expanded topology is used for Network Test and Validation Platform's router, connectivity, protocol,
 endpoint-application, performance, latency, failure, and recovery validation
-where applicable. Project 2's pytest and pyATS configurations target this lab.
+where applicable. Network Test and Validation Platform's pytest and pyATS configurations target this lab.
 
 #### GitHub Actions workflow
 
@@ -419,7 +419,7 @@ It contains two jobs:
 - **Unit tests and reports:** installs the pinned dependencies, checks
   dependency consistency, runs unit tests, and generates the four report
   formats.
-- **Expanded-lab integration and reports:** checks out Project 1, installs
+- **Expanded-lab integration and reports:** checks out Network Automation Platform Project, installs
   Containerlab, builds the endpoint image, deploys the expanded topology,
   waits for endpoint services, runs the expanded-lab tests, uploads reports,
   and destroys the lab even if an earlier step fails.
@@ -470,7 +470,7 @@ It requires:
 The pipeline contains the following stages:
 
 1. Validate agent prerequisites and inspect the existing expanded-lab state.
-2. Run `scripts/setup_environment.sh` to prepare Project 1 and Project 2.
+2. Run `scripts/setup_environment.sh` to prepare Network Automation Platform Project and Network Test and Validation Platform.
 3. Run unit tests and generate JUnit XML, HTML, JSON, and quality-metrics reports.
 4. Run expanded-lab integration tests and generate the same report formats.
 
@@ -489,5 +489,5 @@ Lab cleanup depends on the state detected before the build:
 - If a partial lab already existed, the pipeline stops before deployment so
   that the existing environment can be investigated.
 
-**Execution status:** Jenkins was installed and configured on the local Ubuntu/WSL2 environment. Project 2's Jenkins job completed successfully as Build #7. The Jenkins dashboard reported no test failures and the build archived eight reporting artifacts. The job currently uses manual Build Now execution; GitHub webhook triggering has not been configured.
+**Execution status:** Jenkins was installed and configured on the local Ubuntu/WSL2 environment. Network Test and Validation Platform's Jenkins job completed successfully as Build #7. The Jenkins dashboard reported no test failures and the build archived eight reporting artifacts. The job currently uses manual Build Now execution; GitHub webhook triggering has not been configured.
 
