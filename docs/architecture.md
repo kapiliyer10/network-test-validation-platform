@@ -1,4 +1,4 @@
-# Project 2 — System Architecture
+# Network-test-validation-platform — System Architecture
 
 ## 1. Overview
 
@@ -10,8 +10,8 @@ The platform has two main validation paths:
 1. Router and protocol validation.
 2. Endpoint traffic and performance validation.
 
-Project 1 owns the network automation implementation and Containerlab
-topology definitions. Project 2 consumes the expanded topology as its
+network-automation-platform owns the network automation implementation and Containerlab
+topology definitions. network-test-validation-platform consumes the expanded topology as its
 validation environment.
 
 ## 2. Architecture Diagram
@@ -39,7 +39,7 @@ flowchart TB
         CAPTURE --> REPORT
     end
 
-    subgraph LAB["Project 1 Expanded Containerlab Topology"]
+    subgraph LAB["Network Expanded Containerlab Topology"]
         R1["Nokia SR Linux R1"]
         R2["Nokia SR Linux R2"]
         R3["Nokia SR Linux R3"]
@@ -217,5 +217,5 @@ Reports are stored under:
 - Captures packets.
 - Produces test reports and quality metrics.
 
-This separation allows Project 2 to validate the network without duplicating
-Project 1's configuration-management implementation.
+This separation allows Network Test & Validation Platform to validate the network without duplicating
+Network Automation & Programmability Platform's configuration-management implementation.
