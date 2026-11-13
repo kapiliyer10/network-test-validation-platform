@@ -2,13 +2,13 @@
 
 This document contains the detailed pytest, expanded-lab, performance, packet-capture, and pyATS execution instructions.
 
-Project 2 tests target the expanded Containerlab topology. Deploy the
+Network Test and Validation Platform tests target the expanded Containerlab topology. Deploy the
 expanded lab before running the full regression suite.
 
 ### Recommended regression command
 
 Run the one-command environment setup from Section 6 before executing
-the complete pytest suite from the Project 2 repository root:
+the complete pytest suite from the Network Test and Validation Platform repository root:
 
     cd ~/network-test-validation-platform
     source .venv/bin/activate
@@ -42,7 +42,7 @@ expanded topology:
 ./scripts/setup_environment.sh
 ```
 
-Run this command from the Project 2 repository root. If the environment
+Run this command from the Network Test and Validation Platform repository root. If the environment
 is already deployed and its services are ready, the script reuses it.
 
 To manually rebuild the endpoint image:
@@ -63,7 +63,7 @@ The expanded topology configures the H1 and H2 interfaces with an MTU of
 
 #### 2. Run the expanded-lab test group
 
-Activate the Project 2 virtual environment and run:
+Activate the Network Test and Validation Platform virtual environment and run:
 
 ```bash
 cd ~/network-test-validation-platform
@@ -158,7 +158,7 @@ Pytest markers select tests; they do not deploy or destroy the expanded lab.
 
 ## Run pyATS AEtest Suites
 
-Activate the Project 2 virtual environment before running these commands.
+Activate the Network Test and Validation Platform virtual environment before running these commands.
 
 Run the connectivity tests:
 
@@ -188,7 +188,7 @@ interface, OSPF-neighbor, and route AEtest suites:
 It also defines six LLDP neighbor checks, one negative-connectivity case,
 and one failure/recovery scenario for their corresponding AEtest suites.
 
-The tests execute commands through the existing Project 2 testbed and CLI
+The tests execute commands through the existing Network Test and Validation Platform testbed and CLI
 runner. The runner uses Docker to invoke the SR Linux CLI within each
 router container.
 
