@@ -2,382 +2,238 @@
 
 [![Network Test & Validation CI](https://github.com/kapiliyer10/network-test-validation-platform/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/kapiliyer10/network-test-validation-platform/actions/workflows/ci.yml)
 
-A Python-based network testing and validation framework for a containerized Nokia SR Linux environment.
+A Python-based network test automation framework that validates the **behavior, reliability, and performance** of a live, containerized Nokia SR Linux network.
 
-The platform validates connectivity, protocol behavior, routing, failure recovery, application traffic, and network performance using pytest, pyATS, Docker, and Containerlab.
+Built with **pytest, pyATS, Docker, and Containerlab**, the platform checks router and protocol state, application connectivity, traffic performance, controlled network impairments, and recovery after failures. It also collects packet captures and produces test evidence for local use and CI pipelines.
 
-**`network-automation-platform` manages the network. `network-test-validation-platform` validates its behavior.**
+**Project boundary:** the companion [Network Automation & Programmability Platform](https://github.com/kapiliyer10/network-automation-platform) manages the network. This repository independently validates its observable behavior.
 
 ---
 
-## 1. Project Overview
+## Project highlights
 
-The Network Test & Validation Platform automates network quality assurance against a live network environment.
-
-Its workflow is:
-
-**Define expected behavior → Execute tests → Observe network behavior → Compare results → Collect diagnostic evidence → Generate reports**
-
-This repository (`network-test-validation-platform`) is maintained separately from `network-automation-platform`.
-
-| Repository | Responsibility |
+| Area | Demonstrated capability |
 |---|---|
-| `network-automation-platform` — Network Automation | Device state discovery, desired-state configuration, drift detection, and configuration management |
-| `network-test-validation-platform` — Network Validation | Connectivity, protocol, traffic, performance, failure, recovery, and regression testing |
+| Router and protocol testing | Connectivity, interface state, OSPF neighbors and routes, LLDP, negative tests |
+| Application testing | TCP and UDP request/response validation between Linux endpoints |
+| Performance testing | TCP/UDP throughput, retransmissions, packet loss, jitter, and ICMP RTT |
+| Fault testing | Controlled packet loss and delay, link failure, OSPF failover, and recovery |
+| Troubleshooting | Filtered tcpdump captures, PCAP validation, and Wireshark analysis |
+| Test evidence | JUnit XML, HTML, raw JSON, and quality-metrics JSON |
+| Automation | pytest, native pyATS AEtest, GitHub Actions, and Jenkins |
 
-`network-test-validation-platform` reuses `network-automation-platform`'s expanded Containerlab topology instead of duplicating its network configuration and management implementation.
+### Recorded validation results
 
-## 2. Key Features
+These are representative results recorded during development in the configured containerized lab. They are not production performance guarantees.
 
-### Router and protocol validation
+| Scenario | Recorded observation |
+|---|---|
+| TCP throughput | 10, 25, and 50 Mbps profiles passed; the 50 Mbps profile measured approximately 49.90–50.01 Mbps |
+| UDP throughput | Approximately 10 Mbps receiver throughput with zero packet loss in recorded normal-profile runs |
+| Injected UDP packet loss | A configured 1% impairment produced 1.031% measured receiver loss (89 of 8,634 packets) |
+| Normal ICMP latency | One verified baseline measured 1.001 ms average RTT with 0% packet loss |
+| Injected ICMP delay | A configured 20 ms one-way delay produced a recorded 21.032 ms average RTT |
+| Regression suite | A recorded local full pytest run completed with **43 passed in 103.07 seconds** |
 
-- ICMP connectivity and negative-connectivity testing.
-- Ethernet interface operational-state validation.
-- OSPF neighbor and route validation.
-- LLDP neighbor validation.
-- Controlled link failure, failover, and recovery testing.
-- pytest and native pyATS AEtest execution.
-- Reusable testbed and device abstractions.
-- Docker-based SR Linux CLI execution.
+The 43-test pytest result does **not** include the separate pyATS AEtest scripts. Those suites have their own execution commands.
 
-### Application and traffic validation
+---
 
-- TCP and UDP application request/response testing.
-- TCP iperf3 tests with configured target bitrates of 10, 25, and 50 Mbps, with receiver-throughput and retransmission thresholds.
-- UDP iperf3 tests with configured target bitrates and receiver-throughput, packet-loss, and jitter thresholds.
-- Controlled packet-loss and delay experiments.
-- ICMP round-trip latency and packet-loss measurements.
-- Automated packet capture using tcpdump.
-- PCAP evidence for Wireshark troubleshooting.
+## Architecture
 
-### Reporting and CI/CD
+The platform has two validation paths: router/protocol tests and endpoint traffic/performance tests. Both exercise the expanded lab and produce assertions, diagnostics, or test artifacts.
 
-- JUnit XML test reports.
-- Self-contained HTML reports.
-- Raw pytest JSON reports.
-- Quality-metrics JSON summaries.
-- GitHub Actions CI/CD.
-- Jenkins Declarative Pipeline.
-- Automated test artifact collection.
+~~~mermaid
+flowchart TB
+    CFG["YAML test definitions"] --> RUN["Test runners<br/>pytest and pyATS AEtest"]
+    RUN --> ROUTER["Router and protocol validation"]
+    RUN --> TRAFFIC["Endpoint traffic and performance validation"]
+    ROUTER --> LAB["Expanded Containerlab environment<br/>3 Nokia SR Linux routers + 2 Linux endpoints"]
+    TRAFFIC --> LAB
+    LAB --> RESULTS["Assertions and diagnostics"]
+    TRAFFIC --> PCAP["Filtered tcpdump captures"]
+    RESULTS --> REPORTS["JUnit XML · HTML · JSON · quality metrics"]
+    PCAP --> REPORTS
+~~~
 
-## 3. Architecture
+### Network under test
 
-`network-test-validation-platform` combines two validation paths:
+The expanded lab contains three Nokia SR Linux routers in a triangle and two Linux traffic endpoints. H1 connects to R1; H2 connects to R2. The direct R1–R2 link is the normal path, while R1–R3–R2 provides an alternate path for failover testing.
 
-1. Router and protocol testing through pytest, pyATS AEtest, a shared testbed abstraction, and the Docker-based CLI runner.
-2. Traffic and performance testing through dedicated Linux endpoints H1 and H2 connected through the SR Linux network.
+~~~mermaid
+flowchart TB
+    H1["H1<br/>Linux traffic client"] --- R1["R1<br/>Nokia SR Linux"]
+    R1 ---|"Normal path"| R2["R2<br/>Nokia SR Linux"]
+    R1 --- R3["R3<br/>Nokia SR Linux"]
+    R3 ---|"Alternate path"| R2
+    R2 --- H2["H2<br/>Linux traffic server"]
+~~~
 
-See **[System Architecture](docs/architecture.md)** for the architecture diagram and component responsibilities.
-
-The detailed test execution instructions are available in **[Test Execution and Reporting](docs/testing-and-reporting.md)**.
-
-## 4. Network Topology
-
-`network-test-validation-platform` uses `network-automation-platform`'s expanded `srl-expanded` topology.
-
-It contains three Nokia SR Linux routers and two Linux traffic endpoints.
-
-```text
-             H1
-              |
-              R1
-             /  \
-            /    \
-           R3----R2
-                  |
-                  H2
-```
-
-The routed traffic path between endpoints is:
-
-**H1 → R1 → R2 → H2**
-
-The R3 connection provides the alternate router path used for failover validation.
-
-Endpoint addressing:
-
-| Endpoint | Connected router | IP address |
+| Endpoint | Connected router | Address |
 |---|---|---|
 | H1 | R1 | 10.0.14.2/30 |
 | H2 | R2 | 10.0.24.2/30 |
 
-The expanded lab uses the container prefix:
+The topology definition and deployment scripts belong to the companion Network Automation repository. This project consumes the running expanded lab; it does not duplicate the network configuration-management implementation.
 
-`clab-srl-expanded-`
+---
 
-`network-automation-platform` owns the topology definition and startup/shutdown scripts. `network-test-validation-platform` consumes the running lab for validation.
+## What is validated
 
-See **[System Architecture and Automation Repository Relationship](docs/architecture.md)** for more detail.
+**Router and protocol behavior**
+- Router reachability and negative connectivity.
+- Ethernet interface operational state.
+- OSPF neighbor state and learned routes.
+- LLDP neighbor relationships.
+- Controlled link failure, alternate-path selection, and route restoration.
 
-## 5. Technology Stack
+**Endpoint and traffic behavior**
+- TCP and UDP application request/response exchanges.
+- TCP throughput profiles at 10, 25, and 50 Mbps, including receiver throughput and retransmission thresholds.
+- UDP throughput, packet-loss, and jitter thresholds using iperf3 JSON results.
+- ICMP round-trip latency and packet loss.
+- Controlled delay, packet-loss, and jitter experiments using Linux traffic control.
+
+**Evidence and reporting**
+- Filtered tcpdump captures saved as PCAP files.
+- Packet decoding checks before a capture is accepted.
+- Wireshark inspection of representative TCP, UDP, and ICMP traffic.
+- JUnit XML, self-contained HTML, raw pytest JSON, and aggregated quality metrics.
+
+---
+
+## Technology stack
 
 | Category | Technologies |
 |---|---|
-| Programming | Python 3.12 |
+| Language | Python 3.12 |
 | Test automation | pytest, pyATS AEtest |
-| Configuration | YAML, PyYAML |
-| Network lab | Containerlab, Docker |
-| Network operating system | Nokia SR Linux |
-| Traffic generation | iperf3 |
-| Troubleshooting | tcpdump, Wireshark, PCAP |
-| Reporting | JUnit XML, pytest-html, JSON, quality metrics |
+| Lab and containers | Containerlab, Docker |
+| Network OS | Nokia SR Linux |
+| Test configuration | YAML, PyYAML |
+| Traffic and measurement | iperf3, ping, Linux tc/netem |
+| Packet analysis | tcpdump, Wireshark, PCAP |
+| Reporting | JUnit XML, pytest-html, JSON, custom quality metrics |
 | CI/CD | GitHub Actions, Jenkins |
-| Operating environment | Linux |
 
-Genie parsers are not used for SR Linux in this implementation. Structured router state is validated using native JSON output and Python parsing where applicable.
+---
 
-## 6. Prerequisites
+## Run the tests
 
-Before running `network-test-validation-platform`, install:
+### Prerequisites
 
+- Linux environment.
 - Python 3.12.
-- Docker Engine.
+- Docker Engine running and accessible to your user.
 - Containerlab.
 - Git.
 
-Docker Engine must be running and accessible to your user.
+### Prepare the environment
 
-The setup script checks these prerequisites but does not install system-level Docker or Containerlab packages.
+Clone the repository and run the setup script:
 
-## 7. Set Up the Environment
-
-Clone `network-test-validation-platform`:
-
-```bash
+~~~bash
 git clone https://github.com/kapiliyer10/network-test-validation-platform.git
 cd network-test-validation-platform
-```
-
-Run the one-command environment setup:
-
-```bash
 ./scripts/setup_environment.sh
-```
-
-The script:
-
-1. Checks the required tools and environment.
-2. Clones `network-automation-platform` if the expected checkout does not exist.
-3. Creates the `network-test-validation-platform` virtual environment.
-4. Installs the pinned Python dependencies.
-5. Checks dependency consistency.
-6. Builds the Linux endpoint Docker image.
-7. Deploys `network-automation-platform`'s expanded topology when necessary.
-8. Waits for endpoint services.
-9. Checks router readiness.
-
-An existing `network-automation-platform` checkout is reused without pulling or modifying its Git history or working-tree changes.
-
-By default, `network-automation-platform` is expected at:
-
-`~/network-automation-platform`
-
-To select a different `network-automation-platform` checkout:
-
-```bash
-PROJECT1_DIR="$HOME/projects/network-automation-platform" \
-  ./scripts/setup_environment.sh
-```
-
-Activate the `network-test-validation-platform` virtual environment:
-
-```bash
 source .venv/bin/activate
-```
+~~~
 
-Verify dependencies:
+The setup script checks prerequisites, prepares the companion Network Automation repository if needed, creates the Python virtual environment, installs pinned dependencies, builds the Linux endpoint image, deploys the expanded lab when necessary, and checks endpoint/router readiness.
 
-```bash
-python -m pip check
-```
+By default, the companion repository is expected at **$HOME/network-automation-platform**. The location can be overridden with **PROJECT1_DIR**; see the [test execution guide](docs/testing-and-reporting.md) for details.
 
-Check router readiness:
+### Execute pytest
 
-```bash
-python -m scripts.check_lab_readiness
-```
-
-## 8. Running Tests
-
-### Run unit tests
-
-```bash
+~~~bash
+# Isolated unit tests
 pytest -q -m unit
-```
 
-### Run expanded-lab integration tests
-
-```bash
+# Live expanded-lab integration tests
 pytest -q -m expanded_lab
-```
 
-### Run the complete pytest regression suite
-
-```bash
+# Complete pytest regression suite
 pytest -v
-```
+~~~
 
-A recorded local full-suite run completed with:
+The expanded lab must be running before expanded-lab tests or the complete regression suite are executed. Pytest markers select tests; they do not deploy or destroy the lab.
 
-```text
-43 passed in 103.07s
-```
+The recorded full-suite result above is from a local run. The separate pyATS AEtest suites are not included in these pytest commands.
 
-The separate pyATS AEtest suites require their own invocation and are not automatically included in `pytest -v`.
+For individual test modules, pyATS commands, traffic experiments, report generation, and cleanup instructions, see [Test Execution and Reporting](docs/testing-and-reporting.md).
 
-See **[Test Execution and Reporting](docs/testing-and-reporting.md)** for individual test commands, performance experiments, controlled impairments, packet capture, and pyATS instructions.
+---
 
-## 9. Reporting and Test Evidence
+## Test reports and packet evidence
 
-![Sample pytest HTML report](docs/images/project2-test-report.png)
+The reporting utility is **scripts/run_test_reports.py**. It executes a selected pytest group once and creates:
 
-*Example of the HTML test report generated by the project.*
-
-The reporting utility is:
-
-`scripts/run_test_reports.py`
-
-It executes a pytest selection and generates four report formats:
-
-| Format | Purpose |
+| Artifact | Use |
 |---|---|
-| JUnit XML | Structured test results for CI systems |
-| HTML | Human-readable test report |
-| JSON | Machine-readable pytest results |
-| Quality metrics JSON | Aggregated test counts, pass rate, timings, and failure details |
+| JUnit XML | Structured results for CI systems |
+| HTML report | Human-readable execution summary and test details |
+| Raw JSON | Machine-readable pytest results |
+| Quality-metrics JSON | Counts, pass rate, timings, categories, and failure details |
 
-Reports are stored under:
+Generate a report for unit and expanded-lab tests:
 
-`artifacts/reports/`
-
-Packet captures are stored separately under:
-
-`artifacts/pcap/`
-
-Generated reports and PCAP files are excluded from Git because they are test artifacts.
-
-To generate reports for unit and expanded-lab tests:
-
-```bash
+~~~bash
 python -m scripts.run_test_reports \
   --markers "expanded_lab or unit" \
   --name local-regression
-```
+~~~
 
-## 10. CI/CD
+Reports are written to **artifacts/reports/**. Packet captures are stored separately under **artifacts/pcap/**. Both directories contain generated artifacts and are excluded from Git.
 
-`network-test-validation-platform` supports two CI execution environments.
+![Sample pytest HTML report](docs/images/project2-test-report.png)
 
-### GitHub Actions
+*Example of the HTML report generated by the platform.*
 
-Workflow:
+---
 
-`.github/workflows/ci.yml`
+## CI/CD
 
-The workflow runs on:
+**GitHub Actions** is configured to run on pushes and pull requests targeting **master** or **main**, and on manual dispatch. Its workflow has separate unit-test and expanded-lab integration jobs. The integration job checks out the companion repository, builds the endpoint image, deploys the lab, waits for endpoint services, runs tests, uploads reports (and PCAPs on failure), and attempts lab cleanup.
 
-- Pushes to `master` or `main`.
-- Pull requests targeting `master` or `main`.
-- Manual workflow dispatch.
+**Jenkins** is provided as an additional Declarative Pipeline in **Jenkinsfile**. It validates the Linux agent, prepares the environment, runs unit and expanded-lab tests, publishes JUnit results, and archives reports. The documented local Jenkins verification was Build #7, manually started using **Build Now**. GitHub webhook triggering is not configured.
 
-It contains two jobs:
+See [Implementation Milestones](docs/milestones.md) for the recorded verification history and [Test Execution and Reporting](docs/testing-and-reporting.md) for environment-specific execution details.
 
-1. Unit tests and reports.
-2. Expanded-lab integration tests and reports.
+---
 
-The expanded-lab job checks out `network-automation-platform`, installs Containerlab, builds the endpoint image, deploys the expanded topology, waits for endpoint services, runs tests, uploads reports, and destroys the lab.
+## Repository structure
 
-### Jenkins
-
-The repository also includes a Declarative Pipeline:
-
-`Jenkinsfile`
-
-The Jenkins job retrieves `network-test-validation-platform` from GitHub and executes the same main validation workflow.
-
-Pipeline stages:
-
-1. Validate Jenkins Agent.
-2. Set Up Environment.
-3. Unit Tests and Reports.
-4. Expanded-Lab Integration Tests and Reports.
-
-Jenkins publishes JUnit XML results and archives HTML, JSON, quality-metrics, and failure-related PCAP artifacts.
-
-The local Jenkins installation uses the Built-In Node with the `network-lab` label.
-
-**Recorded local Jenkins verification:** Build #7 completed successfully, the Jenkins dashboard reported no test failures, and eight reporting artifacts were archived. It was manually triggered using **Build Now**; automatic GitHub webhook triggering is not configured.
-
-See the milestone document for the recorded verification history.
-
-## 11. Repository Structure
-
-```text
+~~~text
 network-test-validation-platform/
-│
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-│
-├── artifacts/
-│   ├── pcap/
-│   └── reports/
-│
-├── configs/
-│   ├── lab.yaml
-│   ├── lab-expanded.yaml
-│   └── pyats-testbed.yaml
-│
+├── .github/workflows/ci.yml       # GitHub Actions workflow
+├── configs/                        # Lab, test cases, and pyATS testbed
 ├── docs/
-│   ├── architecture.md
-│   ├── milestones.md
-│   ├── testing-and-reporting.md
-│   └── images/
-│
-├── scripts/
-│   ├── check_lab_readiness.py
-│   ├── run_test_reports.py
-│   ├── setup_environment.sh
-│   └── summarize_quality_metrics.py
-│
-├── src/
-│   ├── packet_capture.py
-│   ├── quality_metrics.py
-│   └── ...
-│
+│   ├── architecture.md             # Architecture and execution paths
+│   ├── testing-and-reporting.md    # Setup, test, and report instructions
+│   ├── milestones.md               # Delivery summary
+│   └── development-history.md      # Detailed implementation record
+├── scripts/                        # Setup, readiness, and reporting utilities
+├── src/                             # CLI, testbed, capture, and metrics helpers
 ├── tests/
-│   ├── aetest/
-│   ├── integration/
-│   └── ...
-│
+│   ├── aetest/                      # Native pyATS AEtest suites
+│   ├── integration/                 # Live network and traffic tests
+│   └── test_*.py                    # Unit tests
 ├── Jenkinsfile
 ├── pytest.ini
 ├── requirements.txt
 └── README.md
-```
+~~~
 
-## 12. Documentation
+## Technical documentation
 
-| Document | Description |
-|---|---|
-| [System Architecture](docs/architecture.md) | Components, test execution paths, topology, and data flow |
-| [Test Execution and Reporting](docs/testing-and-reporting.md) | pytest, pyATS, performance, packet capture, and reporting instructions |
-| [Implementation Milestones](docs/milestones.md) | Full development history, implementation details, and verification records |
+- [System Architecture](docs/architecture.md) — components, network topology, execution paths, and project boundaries.
+- [Test Execution and Reporting](docs/testing-and-reporting.md) — environment setup, pytest, pyATS, traffic experiments, packet capture, reporting, and cleanup.
+- [Implementation Milestones](docs/milestones.md) — concise summary of delivered milestones.
+- [Development History](docs/development-history.md) — detailed implementation notes, troubleshooting decisions, and historical verification records.
 
-## 13. Current Project Status
+## Scope and implementation notes
 
-All nine documented project milestones are complete.
-
-The completed platform includes router and protocol validation, traffic and performance testing, failure and recovery testing, packet capture, reporting, and CI/CD integration.
-
-The full milestone history and its verification records are maintained in **[Implementation Milestones](docs/milestones.md)**.
-
-## 14. Development Principles
-
-- Keep `network-automation-platform` and `network-test-validation-platform` separate.
-- Reuse the existing network rather than rebuilding its configuration-management implementation.
-- Validate observable network behavior.
-- Distinguish diagnostic responses from successful application-level communication.
-- Use unit tests for isolated logic and live integration tests for real network behavior.
-- Collect diagnostic evidence and report failures clearly.
-- Introduce additional abstractions only when they provide demonstrated value.
+- The pytest regression suite and pyATS AEtest scripts are separate execution paths.
+- Genie parsers and native Unicon connection plugins are not used for Nokia SR Linux in this implementation. Router state is validated using native JSON output and Python parsing, or parsing tailored to the observed SR Linux CLI output.
+- Throughput, latency, loss, and jitter values are measured in a containerized lab. They are validation observations under the configured test conditions, not production SLAs or maximum-capacity claims.
+- Controlled impairment tests modify the H1 endpoint's traffic handling temporarily. Run them only in the isolated expanded lab, never on a production network.
