@@ -55,33 +55,29 @@ def test_stop_signals_only_the_recorded_capture_process(monkeypatch, tmp_path):
     assert f"pid_file={capture.remote_pid}" in stop_command
     assert 'kill -INT "$capture_pid"' in stop_command
     assert 'kill -0 "$capture_pid"' in stop_command
+    assert 'process_state=$(awk' in stop_command
+    assert '"$process_state" = "Z"' in stop_command
     assert "killall" not in stop_command
     assert capture.packet_count == 1
     assert capture.started is False
     assert capture.output_path.is_file()
 
 
-def test_stop_preserves_capture_when_recorded_pid_is_missing(
+def test_stop_preserves_remote_capture_when_recorded_pid_is_missing(
     monkeypatch, tmp_path
 ):
     capture = make_capture(tmp_path)
     capture.started = True
     cleanup_called = False
 
-    class MissingPid:
-        @staticmethod
-        def run(command, timeout=15.0):
-            return SimpleNamespace(
-                stdout="",
-                stderr="Capture PID file is missing",
-                returncode=1,
-            )
+    def fail_stop(_command, timeout=15.0):
+        raise PacketCaptureError("Capture PID file is missing")
 
     def fail_cleanup():
         nonlocal cleanup_called
         cleanup_called = True
 
-    monkeypatch.setattr(capture, "_run", MissingPid.run)
+    monkeypatch.setattr(capture, "_run", fail_stop)
     monkeypatch.setattr(capture, "_cleanup_remote", fail_cleanup)
     monkeypatch.setattr("src.packet_capture.time.sleep", lambda _seconds: None)
 
