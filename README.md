@@ -217,7 +217,7 @@ network-test-validation-platform/
 ├── tests/
 │   ├── aetest/                      # Native pyATS AEtest suites
 │   ├── integration/                 # Live network and traffic tests
-│   └──                                 # Unit tests
+│   └── test_*.py                    # Unit tests
 ├── Jenkinsfile
 ├── pytest.ini
 ├── requirements.txt
