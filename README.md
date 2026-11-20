@@ -39,22 +39,9 @@ The 43-test pytest result does **not** include the separate pyATS AEtest scripts
 
 ---
 
-## Architecture
+## Network overview
 
-The platform has two validation paths: router/protocol tests and endpoint traffic/performance tests. Both exercise the expanded lab and produce assertions, diagnostics, or test artifacts.
-
-~~~mermaid
-flowchart TB
-    CFG["YAML test definitions"] --> RUN["Test runners<br/>pytest and pyATS AEtest"]
-    RUN --> ROUTER["Router and protocol validation"]
-    RUN --> TRAFFIC["Endpoint traffic and performance validation"]
-    ROUTER --> LAB["Expanded Containerlab environment<br/>3 Nokia SR Linux routers + 2 Linux endpoints"]
-    TRAFFIC --> LAB
-    LAB --> RESULTS["Assertions and diagnostics"]
-    TRAFFIC --> PCAP["Filtered tcpdump captures"]
-    RESULTS --> REPORTS["JUnit XML · HTML · JSON · quality metrics"]
-    PCAP --> REPORTS
-~~~
+The expanded lab topology is shown below. The platform's block diagram and component-level architecture are documented in [System Architecture](docs/architecture.md).
 
 ### Network under test
 
