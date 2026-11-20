@@ -55,6 +55,8 @@ def test_stop_signals_only_the_recorded_capture_process(monkeypatch, tmp_path):
     assert f"pid_file={capture.remote_pid}" in stop_command
     assert 'kill -INT "$capture_pid"' in stop_command
     assert 'kill -0 "$capture_pid"' in stop_command
+    assert 'process_name=$(cat "/proc/$capture_pid/comm"' in stop_command
+    assert '[ "$process_name" = "tcpdump" ]' in stop_command
     assert 'process_state=$(awk' in stop_command
     assert '"$process_state" = "Z"' in stop_command
     assert "killall" not in stop_command
