@@ -39,29 +39,9 @@ The 43-test pytest result does **not** include the separate pyATS AEtest scripts
 
 ---
 
-## Network overview
+## Architecture
 
-The expanded lab topology is shown below. The platform's block diagram and component-level architecture are documented in [System Architecture](docs/architecture.md).
-
-### Network under test
-
-The expanded lab contains three Nokia SR Linux routers in a triangle and two Linux traffic endpoints. H1 connects to R1; H2 connects to R2. The direct R1–R2 link is the normal path, while R1–R3–R2 provides an alternate path for failover testing.
-
-~~~mermaid
-flowchart TB
-    H1["H1<br/>Linux traffic client"] --- R1["R1<br/>Nokia SR Linux"]
-    R1 ---|"Normal path"| R2["R2<br/>Nokia SR Linux"]
-    R1 --- R3["R3<br/>Nokia SR Linux"]
-    R3 ---|"Alternate path"| R2
-    R2 --- H2["H2<br/>Linux traffic server"]
-~~~
-
-| Endpoint | Connected router | Address |
-|---|---|---|
-| H1 | R1 | 10.0.14.2/30 |
-| H2 | R2 | 10.0.24.2/30 |
-
-The topology definition and deployment scripts belong to the companion Network Automation repository. This project consumes the running expanded lab; it does not duplicate the network configuration-management implementation.
+The component block diagram, network topology, and validation paths are documented in [System Architecture](docs/architecture.md).
 
 ---
 
