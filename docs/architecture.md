@@ -1,221 +1,153 @@
-# Network-test-validation-platform — System Architecture
+# System Architecture
 
-## 1. Overview
+## 1. Purpose and boundaries
 
-The Network Test & Validation Platform validates observable network behavior
-using a live Nokia SR Linux environment.
+The Network Test & Validation Platform validates observable network behavior in a running Nokia SR Linux environment. It does not own the network topology or duplicate the companion Network Automation & Programmability Platform's configuration-management functions.
 
-The platform has two main validation paths:
+The platform has two validation paths:
 
-1. Router and protocol validation.
-2. Endpoint traffic and performance validation.
+1. **Router and protocol validation** — uses pytest and native pyATS AEtest to inspect router connectivity, interfaces, OSPF, LLDP, routes, and failure recovery.
+2. **Endpoint traffic and performance validation** — uses Linux endpoints to exercise TCP/UDP applications and measure throughput, packet loss, jitter, and ICMP latency.
 
-network-automation-platform owns the network automation implementation and Containerlab
-topology definitions. network-test-validation-platform consumes the expanded topology as its
-validation environment.
+## 2. High-level architecture
 
-## 2. Architecture Diagram
-
-```mermaid
+~~~mermaid
 flowchart TB
-    subgraph P2["Project 2 — Network Test & Validation Platform"]
-        CONFIG["YAML Lab and Test Definitions"]
-        PYTEST["pytest"]
-        AETEST["pyATS AEtest"]
-        TESTBED["Testbed and RouterDevice Abstraction"]
-        CLI["Shared Docker CLI Runner"]
-        TRAFFIC["Endpoint Traffic and Performance Tests"]
-        CAPTURE["PacketCapture Utility"]
-        REPORT["Reporting and Quality Metrics"]
+    CFG["YAML lab and test definitions"] --> RUN["pytest / pyATS AEtest"]
+    RUN --> ROUTER["Router and protocol tests"]
+    RUN --> ENDPOINT["Endpoint traffic and performance tests"]
+    ROUTER --> LAB["Expanded Containerlab lab"]
+    ENDPOINT --> LAB
+    LAB --> ASSERT["Assertions and diagnostics"]
+    ENDPOINT --> CAPTURE["tcpdump / PCAP evidence"]
+    ASSERT --> REPORT["JUnit · HTML · JSON · quality metrics"]
+    CAPTURE --> REPORT
+~~~
 
-        CONFIG --> PYTEST
-        CONFIG --> AETEST
-        PYTEST --> TESTBED
-        AETEST --> TESTBED
-        TESTBED --> CLI
-        PYTEST --> TRAFFIC
-        TRAFFIC --> REPORT
-        PYTEST --> REPORT
-        CAPTURE --> REPORT
-    end
+The two test paths share the same network environment but interact with it differently. Router tests execute Nokia SR Linux CLI commands in router containers. Traffic tests execute Linux tools and application clients from H1/H2.
 
-    subgraph LAB["Network Expanded Containerlab Topology"]
-        R1["Nokia SR Linux R1"]
-        R2["Nokia SR Linux R2"]
-        R3["Nokia SR Linux R3"]
-        H1["Linux Endpoint H1"]
-        H2["Linux Endpoint H2"]
+## 3. Network topology
 
-        H1 --- R1
-        R1 --- R2
-        R1 --- R3
-        R3 --- R2
-        R2 --- H2
-    end
+The expanded lab contains three Nokia SR Linux routers and two Linux endpoints. The routers form a triangle. H1 is attached to R1 and H2 to R2.
 
-    CLI --> R1
-    CLI --> R2
-    CLI --> R3
+~~~mermaid
+flowchart TB
+    H1["H1<br/>Linux endpoint"] --- R1["R1<br/>Nokia SR Linux"]
+    R1 ---|"Direct link"| R2["R2<br/>Nokia SR Linux"]
+    R1 --- R3["R3<br/>Nokia SR Linux"]
+    R3 ---|"Alternate route"| R2
+    R2 --- H2["H2<br/>Linux endpoint"]
+~~~
 
-    TRAFFIC --> H1
-    TRAFFIC --> H2
-    CAPTURE --> H1
+| Segment or endpoint | Address |
+|---|---|
+| R1–R2 | 10.0.12.0/30 |
+| R1–R3 | 10.0.31.0/30 |
+| R2–R3 | 10.0.23.0/30 |
+| H1 | 10.0.14.2/30 |
+| H2 | 10.0.24.2/30 |
 
-    REPORT --> XML["JUnit XML"]
-    REPORT --> HTML["HTML Report"]
-    REPORT --> JSON["Raw JSON"]
-    REPORT --> METRICS["Quality Metrics JSON"]
-    CAPTURE --> PCAP["PCAP Evidence"]
-```
+H1's traffic to H2 normally traverses R1–R2. The R1–R3–R2 path is used for OSPF failover validation when the direct R1–R2 link is disabled.
 
-## 3. Router and Protocol Validation
+## 4. Router and protocol validation path
 
-Router validation uses YAML-based test definitions and a native pyATS
-testbed configuration.
+Router test cases are defined in YAML and the pyATS testbed file. pytest tests and native AEtest scripts use the project's testbed/device abstractions and shared Docker CLI runner.
 
-The execution path is:
+~~~text
+YAML test cases / pyATS testbed
+              |
+              v
+      pytest or pyATS AEtest
+              |
+              v
+     Testbed / RouterDevice
+              |
+              v
+       Docker CLI runner
+              |
+              v
+    Docker exec -> sr_cli
+              |
+              v
+    Parse output and assert
+              |
+              v
+    Test result and diagnostics
+~~~
 
-```text
-YAML Test Definitions / pyATS Testbed
-                 |
-                 v
-          pytest or pyATS AEtest
-                 |
-                 v
-       Testbed and Device Abstraction
-                 |
-                 v
-          Docker CLI Connection
-                 |
-                 v
-           Nokia SR Linux CLI
-                 |
-                 v
-       Parse Output and Validate State
-                 |
-                 v
-           Test Result / Evidence
-```
+The shared runner executes commands inside the SR Linux router containers. The test code validates observed output against expected state.
 
-The Testbed and RouterDevice abstractions map logical router names to the
-expanded lab's R1, R2, and R3 containers.
+Validation includes:
+- Router connectivity and negative connectivity.
+- Ethernet interface operational state.
+- OSPF neighbor state and learned routes.
+- LLDP neighbor and port relationships.
+- Controlled link failure, OSPF alternate-path selection, and recovery.
 
-The custom Docker connection adapter reuses the shared CLI runner instead
-of opening a persistent SSH session.
+The custom pyATS Docker connection adapter reuses the CLI runner. It does not establish a persistent SSH session.
 
-Validation areas include:
+## 5. Endpoint traffic and performance path
 
-- Router connectivity.
-- Interface operational state.
-- OSPF neighbor state.
-- Routing information.
-- LLDP adjacencies.
-- Negative connectivity.
-- Controlled failure, failover, and recovery.
+H1 and H2 are Linux traffic endpoints connected through the router topology. Traffic tools run in the endpoints rather than on the Nokia routers.
 
-Genie parsers are not used for SR Linux in this implementation. Structured
-state is validated using native JSON output and Python parsing where
-applicable.
+| Test type | Mechanism | Main assertions |
+|---|---|---|
+| TCP application | Python sockets | Expected request/response payload |
+| UDP application | Python UDP sockets | Expected request/response payload |
+| TCP performance | iperf3 JSON | Receiver throughput and retransmissions |
+| UDP performance | iperf3 JSON | Receiver throughput, packet loss, and jitter |
+| ICMP latency | ping statistics | RTT and packet-loss thresholds |
+| Controlled impairment | Linux tc/netem | Injected loss, delay, or jitter is detected and cleaned up |
 
-## 4. Traffic and Performance Validation
+The impairment tests inspect the initial qdisc state before modifying it. Cleanup removes the test's temporary netem rule and verifies that the interface returns to its expected noqueue state. These tests are intended for the isolated lab only.
 
-The expanded lab includes two dedicated Linux traffic endpoints.
+## 6. Packet capture and reporting
 
-```text
-             H1: iperf3 Client
-                    |
-                    v
-                   R1
-                  /  \
-                 /    \
-                R3-----R2
-                       |
-                       v
-              H2: iperf3 Server
-```
+The reusable **src/packet_capture.py** helper:
 
-H1 connects to R1 using `10.0.14.2/30`.
+1. Starts filtered tcpdump in the selected Linux endpoint.
+2. Records the process ID for that individual capture.
+3. Waits for capture readiness.
+4. Stops that process using its recorded PID.
+5. Copies the PCAP to **artifacts/pcap/**.
+6. Decodes the capture and verifies that packets are present.
 
-H2 connects to R2 using `10.0.24.2/30`.
+The helper preserves remote diagnostic files when shutdown or validation fails. The current test workflow uses normal sequential pytest execution; parallel capture execution is not claimed as verified.
 
-The endpoint tests validate:
-
-- TCP and UDP application exchanges.
-- TCP throughput.
-- UDP throughput.
-- Packet loss.
-- Jitter.
-- ICMP round-trip latency.
-- Controlled traffic delay and packet-loss impairments.
-
-Traffic generation runs on Linux endpoints rather than inside the Nokia
-routers.
-
-## 5. Packet Capture and Evidence
-
-The reusable `src/packet_capture.py` helper runs filtered tcpdump captures
-on H1's `eth1` interface.
-
-The helper:
-
-1. Starts tcpdump inside the H1 container.
-2. Waits for capture readiness.
-3. Allows the test to generate traffic.
-4. Stops the capture.
-5. Copies the PCAP file to the Project 2 repository.
-6. Verifies that packets can be decoded.
-
-PCAP files are stored under:
-
-`artifacts/pcap/`
-
-These captures provide packet-level evidence alongside pytest results
-and performance measurements.
-
-The current capture helper uses `killall -INT tcpdump` inside H1.
-Therefore, capture tests must run sequentially until shutdown is
-implemented using process-specific identification.
-
-## 6. Reporting Architecture
-
-The reporting utility is:
-
-`scripts/run_test_reports.py`
-
-It executes a selected pytest test group and generates:
+The report utility **scripts/run_test_reports.py** generates four outputs from a single pytest run:
 
 | Output | Purpose |
 |---|---|
-| JUnit XML | Structured test results for CI systems |
-| HTML | Human-readable test report |
+| JUnit XML | CI test-result integration |
+| Self-contained HTML | Human-readable report |
 | Raw JSON | Machine-readable pytest results |
-| Quality metrics JSON | Aggregated counts, timings, pass rate, and failure details |
+| Quality-metrics JSON | Test counts, pass rate, timings, categories, and failure details |
 
-The quality-metrics implementation is in:
+Reports are saved under **artifacts/reports/**. PCAP files are saved separately under **artifacts/pcap/**. Generated artifacts are excluded from version control.
 
-`src/quality_metrics.py`
+## 7. Project responsibilities
 
-Reports are stored under:
+| Network Automation & Programmability Platform | Network Test & Validation Platform |
+|---|---|
+| Owns Containerlab topology definitions | Consumes the running lab |
+| Deploys and removes the network | Prepares and checks the test environment |
+| Owns router configuration and state-management implementation | Executes router and endpoint tests |
+| Provides the expanded topology | Measures traffic and performance |
+| — | Validates failure, recovery, and regression behavior |
+| — | Captures packets and generates test reports |
 
-`artifacts/reports/`
+This separation keeps network management and network validation as distinct projects.
 
-## 7. Project 1 and Project 2 Responsibilities
+## 8. Implementation scope and limitations
 
-**Project 1 — Network Automation & Programmability Platform**
+- pytest and pyATS AEtest are separate execution paths. The pytest full-suite result does not include AEtest scripts.
+- Genie parsers and native Unicon connection plugins are not used for SR Linux. Structured router state is validated using native JSON output and Python parsing where applicable; other checks use parsing tailored to observed SR Linux CLI output.
+- Performance measurements are specific to the configured containerized lab and are not production SLAs.
+- Controlled impairment tests change traffic handling on H1 and must only run in the isolated expanded lab.
+- Packet capture shutdown is process-specific. Although each capture uses its own PID and temporary files, the repository's current verification does not establish parallel test execution as supported.
 
-- Owns the Containerlab topology definitions.
-- Provides the SR Linux router configurations.
-- Deploys and destroys the expanded network environment.
-- Implements network configuration and state-management functionality.
+## 9. Related documentation
 
-**Project 2 — Network Test & Validation Platform**
-
-- Prepares the test environment.
-- Executes router and endpoint validation.
-- Measures traffic and performance.
-- Tests failure and recovery.
-- Captures packets.
-- Produces test reports and quality metrics.
-
-This separation allows Network Test & Validation Platform to validate the network without duplicating
-Network Automation & Programmability Platform's configuration-management implementation.
+- [Test Execution and Reporting](testing-and-reporting.md)
+- [Implementation Milestones](milestones.md)
+- [Detailed Development History](development-history.md)
