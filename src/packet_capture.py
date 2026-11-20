@@ -201,6 +201,8 @@ class PacketCapture:
                 'echo "Could not signal recorded capture process" >&2; exit 1; }; '
                 'attempt=0; '
                 'while kill -0 "$capture_pid" 2>/dev/null; do '
+                'process_state=$(awk \'{print $3}\' "/proc/$capture_pid/stat" 2>/dev/null || true); '
+                '[ "$process_state" = "Z" ] && break; '
                 'attempt=$((attempt + 1)); '
                 '[ "$attempt" -lt 50 ] || { '
                 'echo "Timed out waiting for capture process to exit" >&2; exit 1; }; '
