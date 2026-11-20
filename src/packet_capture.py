@@ -190,8 +190,23 @@ class PacketCapture:
             # interrupt tcpdump, and give it time to finalize the PCAP.
             time.sleep(1.0)
             stop_command = (
-                "killall -INT tcpdump 2>/dev/null || true; "
-                "sleep 1"
+                f"pid_file={shlex.quote(self.remote_pid)}; "
+                '[ -s "$pid_file" ] || { echo "Capture PID file is missing" >&2; exit 1; }; '
+                'capture_pid=$(cat "$pid_file"); '
+                'case "$capture_pid" in ""|*[!0-9]*) '
+                'echo "Capture PID file is invalid" >&2; exit 1 ;; esac; '
+                'kill -0 "$capture_pid" 2>/dev/null || { '
+                'echo "Recorded capture process is not running" >&2; exit 1; }; '
+                'kill -INT "$capture_pid" || { '
+                'echo "Could not signal recorded capture process" >&2; exit 1; }; '
+                'attempt=0; '
+                'while kill -0 "$capture_pid" 2>/dev/null; do '
+                'attempt=$((attempt + 1)); '
+                '[ "$attempt" -lt 50 ] || { '
+                'echo "Timed out waiting for capture process to exit" >&2; exit 1; }; '
+                'sleep 0.1; '
+                'done; '
+                'sleep 0.1'
             )
             self._run(
                 [
